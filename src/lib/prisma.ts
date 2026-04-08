@@ -1,6 +1,5 @@
 import { PrismaClient } from "@prisma/client";
 import { PrismaNeon } from "@prisma/adapter-neon";
-import { Pool } from "@neondatabase/serverless";
 
 export function createPrismaClient(databaseUrl?: string): PrismaClient {
   const url = databaseUrl ?? process.env.DATABASE_URL;
@@ -22,8 +21,6 @@ export function createPrismaClient(databaseUrl?: string): PrismaClient {
   // Strip channel_binding param - incompatible with Neon adapter (TCP-only feature)
   const cleanUrl = new URL(url);
   cleanUrl.searchParams.delete("channel_binding");
-  const pool = new Pool({ connectionString: cleanUrl.toString() });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const adapter = new PrismaNeon(pool as any);
+  const adapter = new PrismaNeon({ connectionString: cleanUrl.toString() });
   return new PrismaClient({ adapter });
 }
