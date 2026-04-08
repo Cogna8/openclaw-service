@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server";
-import { NotImplementedError } from "../../../../../../src/lib/errors.js";
 import { authenticatedParamRoute } from "../../../../../../src/lib/route-handler.js";
 import { validateRuleIdParam } from "../../../../../../src/middleware/validation.js";
+import { disableRule } from "../../../../../../src/services/rule-crud.js";
 
 export const POST = authenticatedParamRoute<{ ruleId: string }>({
   validate: (params) => validateRuleIdParam(params.ruleId),
-  handler: async () => {
-    return new NotImplementedError(
-      "This endpoint will be implemented in Pack 4",
-    ).toResponse();
+  handler: async ({ auth, params }) => {
+    const result = await disableRule(auth.accountId, params.ruleId, auth.apiKeyId);
+    return NextResponse.json(result, { status: 200 });
   },
 });
