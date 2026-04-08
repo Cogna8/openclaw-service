@@ -1,9 +1,10 @@
-import { PrismaClient } from "@prisma/client";
 import { createPrismaClient } from "./prisma.js";
 
-let instance: PrismaClient | undefined;
+type DbClient = ReturnType<typeof createPrismaClient>;
 
-export function getDb(): PrismaClient {
+let instance: DbClient | undefined;
+
+export function getDb(): DbClient {
   if (!instance) {
     instance = createPrismaClient();
   }
