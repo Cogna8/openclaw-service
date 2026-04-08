@@ -1,10 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { PrismaNeon } from "@prisma/adapter-neon";
-import { Pool, neonConfig } from "@neondatabase/serverless";
-
-// Configure WebSocket for Node.js serverless environments (Vercel)
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-neonConfig.webSocketConstructor = require("ws");
+import { Pool } from "@neondatabase/serverless";
 
 export function createPrismaClient(databaseUrl?: string): PrismaClient {
   const url = databaseUrl ?? process.env.DATABASE_URL;
