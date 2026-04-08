@@ -72,7 +72,7 @@ describe("authenticateRequest", () => {
 
   it("resolves auth context for valid active key", async () => {
     mockFindFirst.mockResolvedValue({
-      id: 1,
+      id: "uuid-internal-id",
       publicId: "key_abc12345",
       accountId: "acct_xyz",
     });
@@ -81,7 +81,7 @@ describe("authenticateRequest", () => {
     );
     expect(ctx).toEqual({
       accountId: "acct_xyz",
-      apiKeyId: "key_abc12345",
+      apiKeyId: "uuid-internal-id",
       publicKeyId: "key_abc12345",
     });
   });
