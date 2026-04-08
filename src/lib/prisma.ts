@@ -1,5 +1,10 @@
 import { PrismaClient } from "@prisma/client";
-import { PrismaNeonHttp } from "@prisma/adapter-neon";
+import { PrismaNeon } from "@prisma/adapter-neon";
+import { Pool, neonConfig } from "@neondatabase/serverless";
+import ws from "ws";
+
+// Configure WebSocket for Node.js serverless environments (Vercel)
+neonConfig.webSocketConstructor = ws;
 
 export function createPrismaClient(databaseUrl?: string): PrismaClient {
   const url = databaseUrl ?? process.env.DATABASE_URL;
@@ -18,9 +23,10 @@ export function createPrismaClient(databaseUrl?: string): PrismaClient {
     }
   }
 
-  // Strip channel_binding param - incompatible with Neon HTTP adapter (TCP-only feature)
+  // Strip channel_binding param - incompatible with Neon adapter (TCP-only feature)
   const cleanUrl = new URL(url);
   cleanUrl.searchParams.delete("channel_binding");
-  const adapter = new PrismaNeonHttp(cleanUrl.toString(), {});
+  const pool = new Pool({ connectionString: cleanUrl.toString() });
+  const adapter = new PrismaNeon(pool);
   return new PrismaClient({ adapter });
 }
