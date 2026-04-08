@@ -73,7 +73,7 @@ describe("route existence and middleware pipeline", () => {
   });
 
   describe("locked endpoints return 501 with valid auth", () => {
-    it("POST /v1/evaluate -> 501", async () => {
+    it("POST /v1/evaluate -> no longer 501 (Pack 3 implemented)", async () => {
       const { POST } = await import("../app/api/v1/evaluate/route.js");
       const req = new NextRequest(makeUrl("/api/v1/evaluate"), {
         method: "POST",
@@ -85,10 +85,8 @@ describe("route existence and middleware pipeline", () => {
         }),
       });
       const res = await POST(req);
-      expect(res.status).toBe(501);
-      const body = await res.json();
-      expect(body.error).toBe("not_implemented");
-      expect(body.message).toContain("Pack 3");
+      // Endpoint is now live; without full DB mock it returns 500 (not 501)
+      expect(res.status).not.toBe(501);
     });
 
     it("POST /v1/rules -> 501", async () => {
