@@ -86,5 +86,9 @@ export function handleApiError(error: unknown): NextResponse {
   if (error instanceof ApiError) {
     return error.toResponse();
   }
+  console.error("[openclaw-service] Unhandled error:", error instanceof Error ? error.message : error);
+  if (error instanceof Error && error.stack) {
+    console.error(error.stack);
+  }
   return new ServerError().toResponse();
 }
