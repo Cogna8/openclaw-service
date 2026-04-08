@@ -41,7 +41,7 @@ export async function authenticateRequest(req: NextRequest): Promise<AuthContext
 
   return {
     accountId: apiKey.accountId,
-    apiKeyId: apiKey.publicId,
+    apiKeyId: apiKey.id,
     publicKeyId: apiKey.publicId,
   };
 }
