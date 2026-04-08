@@ -18,6 +18,9 @@ export function createPrismaClient(databaseUrl?: string): PrismaClient {
     }
   }
 
-  const adapter = new PrismaNeonHttp(url, {});
+  // Strip channel_binding param - incompatible with Neon HTTP adapter (TCP-only feature)
+  const cleanUrl = new URL(url);
+  cleanUrl.searchParams.delete("channel_binding");
+  const adapter = new PrismaNeonHttp(cleanUrl.toString(), {});
   return new PrismaClient({ adapter });
 }
