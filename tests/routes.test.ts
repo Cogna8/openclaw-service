@@ -89,7 +89,7 @@ describe("route existence and middleware pipeline", () => {
       expect(res.status).not.toBe(501);
     });
 
-    it("POST /v1/rules -> 501", async () => {
+    it("POST /v1/rules -> no longer 501 (Pack 4 implemented)", async () => {
       const { POST } = await import("../app/api/v1/rules/route.js");
       const req = new NextRequest(makeUrl("/api/v1/rules"), {
         method: "POST",
@@ -101,26 +101,20 @@ describe("route existence and middleware pipeline", () => {
         }),
       });
       const res = await POST(req);
-      expect(res.status).toBe(501);
-      const body = await res.json();
-      expect(body.message).toContain("Pack 4");
+      expect(res.status).not.toBe(501);
     });
 
-    it("GET /v1/rules -> 501", async () => {
+    it("GET /v1/rules -> no longer 501 (Pack 4 implemented)", async () => {
       const { GET } = await import("../app/api/v1/rules/route.js");
-      const req = new NextRequest(
-        makeUrl("/api/v1/rules?agent_id=agt_test"),
-      );
-      // Need to add auth header
       const req2 = new NextRequest(
         makeUrl("/api/v1/rules?agent_id=agt_test"),
         { headers: authedHeaders() },
       );
       const res = await GET(req2);
-      expect(res.status).toBe(501);
+      expect(res.status).not.toBe(501);
     });
 
-    it("DELETE /v1/rules/:ruleId -> 501", async () => {
+    it("DELETE /v1/rules/:ruleId -> no longer 501 (Pack 4 implemented)", async () => {
       const { DELETE } = await import(
         "../app/api/v1/rules/[ruleId]/route.js"
       );
@@ -131,10 +125,10 @@ describe("route existence and middleware pipeline", () => {
       const res = await DELETE(req, {
         params: Promise.resolve({ ruleId: "rl_test1234" }),
       });
-      expect(res.status).toBe(501);
+      expect(res.status).not.toBe(501);
     });
 
-    it("POST /v1/rules/:ruleId/enable -> 501", async () => {
+    it("POST /v1/rules/:ruleId/enable -> no longer 501 (Pack 4 implemented)", async () => {
       const { POST } = await import(
         "../app/api/v1/rules/[ruleId]/enable/route.js"
       );
@@ -145,10 +139,10 @@ describe("route existence and middleware pipeline", () => {
       const res = await POST(req, {
         params: Promise.resolve({ ruleId: "rl_test1234" }),
       });
-      expect(res.status).toBe(501);
+      expect(res.status).not.toBe(501);
     });
 
-    it("POST /v1/rules/:ruleId/disable -> 501", async () => {
+    it("POST /v1/rules/:ruleId/disable -> no longer 501 (Pack 4 implemented)", async () => {
       const { POST } = await import(
         "../app/api/v1/rules/[ruleId]/disable/route.js"
       );
@@ -159,7 +153,7 @@ describe("route existence and middleware pipeline", () => {
       const res = await POST(req, {
         params: Promise.resolve({ ruleId: "rl_test1234" }),
       });
-      expect(res.status).toBe(501);
+      expect(res.status).not.toBe(501);
     });
 
     it("POST /v1/agents/register -> 501", async () => {
