@@ -1,0 +1,23 @@
+import { PrismaClient } from "@prisma/client";
+import { PrismaNeonHttp } from "@prisma/adapter-neon";
+
+export function createPrismaClient(databaseUrl?: string): PrismaClient {
+  const url = databaseUrl ?? process.env.DATABASE_URL;
+  if (!url) {
+    throw new Error("DATABASE_URL is required");
+  }
+
+  // Use undici proxy agent when HTTPS_PROXY is set (e.g., in sandboxed environments)
+  if (process.env.HTTPS_PROXY || process.env.HTTP_PROXY) {
+    try {
+      const { ProxyAgent, setGlobalDispatcher } = require("undici") as typeof import("undici");
+      const proxyUrl = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
+      if (proxyUrl) setGlobalDispatcher(new ProxyAgent(proxyUrl));
+    } catch {
+      // undici not available, proceed without proxy
+    }
+  }
+
+  const adapter = new PrismaNeonHttp(url, {});
+  return new PrismaClient({ adapter });
+}

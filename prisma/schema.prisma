@@ -1,0 +1,342 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Enums are created via raw SQL migration; Prisma maps to them here.
+
+enum plan_t {
+  free
+  paid
+  enterprise
+}
+
+enum account_status_t {
+  active
+  suspended
+  closed
+}
+
+enum api_key_status_t {
+  active
+  revoked
+}
+
+enum agent_source_t {
+  openclaw
+}
+
+enum agent_status_t {
+  active
+  archived
+}
+
+enum action_class_t {
+  file_read
+  file_write
+  file_delete
+  exec
+  browser
+  message_send
+  email_read
+  email_send
+  email_archive
+  email_delete
+  calendar_read
+  calendar_write
+  memory_write
+  memory_delete
+  cron_create
+  cron_delete
+  session_spawn
+}
+
+enum rule_type_t {
+  block
+  confirm
+  exclude
+  protect
+  threshold
+}
+
+enum rule_status_t {
+  active
+  disabled
+  removed
+}
+
+enum rule_target_t {
+  sender
+  path
+  resource_id
+}
+
+enum threshold_period_t {
+  session
+}
+
+enum channel_type_t {
+  direct
+  group
+  channel
+  unknown
+}
+
+enum decision_t {
+  allow
+  block
+}
+
+enum eval_mode_t {
+  normal
+  degraded
+}
+
+enum reason_code_t {
+  protected_target
+  confirmation_required
+  threshold_exceeded
+  excluded_target
+  blocked_tool
+}
+
+enum rule_event_type_t {
+  created
+  enabled
+  disabled
+  removed
+}
+
+enum actor_type_t {
+  api_key
+  console_user
+  system
+}
+
+// ─── Models ───────────────────────────────────────────────────────────
+
+model Account {
+  id                       String           @id @default(uuid()) @db.Uuid
+  publicId                 String           @unique @map("public_id")
+  ownerUserId              String?          @map("owner_user_id")
+  plan                     plan_t           @default(free)
+  status                   account_status_t @default(active)
+  evaluationsLimitMonthly  Int              @default(10000) @map("evaluations_limit_monthly")
+  maxAgents                Int              @default(3) @map("max_agents")
+  maxRulesPerAgent         Int              @default(25) @map("max_rules_per_agent")
+  postCapNewRulesLimit     Int              @default(3) @map("post_cap_new_rules_limit")
+  apiVersion               String           @default("v1") @map("api_version")
+  capabilityFlags          Json             @default("{}") @map("capability_flags")
+  createdAt                DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                DateTime         @updatedAt @map("updated_at") @db.Timestamptz
+
+  apiKeys      ApiKey[]
+  agents       Agent[]
+  rules        Rule[]
+  auditEvents  RuleAuditEvent[]
+  usagePeriods UsagePeriod[]
+  evaluations  EvaluationEvent[]
+
+  @@index([ownerUserId], map: "idx_accounts_owner_user_id")
+  @@index([plan, status], map: "idx_accounts_plan_status")
+  @@map("accounts")
+}
+
+model ApiKey {
+  id              String            @id @default(uuid()) @db.Uuid
+  publicId        String            @unique @map("public_id")
+  accountId       String            @map("account_id") @db.Uuid
+  label           String
+  lookupHash      String            @unique @map("lookup_hash")
+  secretHash      String            @map("secret_hash")
+  secretPrefix    String            @map("secret_prefix")
+  lastFour        String            @map("last_four")
+  status          api_key_status_t  @default(active)
+  issuedAt        DateTime          @default(now()) @map("issued_at") @db.Timestamptz
+  lastUsedAt      DateTime?         @map("last_used_at") @db.Timestamptz
+  revokedAt       DateTime?         @map("revoked_at") @db.Timestamptz
+  createdByUserId String?           @map("created_by_user_id")
+  revokedByUserId String?           @map("revoked_by_user_id")
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime          @updatedAt @map("updated_at") @db.Timestamptz
+
+  account               Account          @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  rulesCreatedByThisKey  Rule[]           @relation("RuleCreatedByApiKey")
+  auditEventsAsActor     RuleAuditEvent[] @relation("AuditActorApiKey")
+  evaluationEvents       EvaluationEvent[]
+
+  @@index([accountId], map: "idx_api_keys_account_id")
+  @@index([status], map: "idx_api_keys_status")
+  @@map("api_keys")
+}
+
+model Agent {
+  id                   String         @id @default(uuid()) @db.Uuid
+  publicId             String         @unique @map("public_id")
+  accountId            String         @map("account_id") @db.Uuid
+  source               agent_source_t @default(openclaw)
+  externalId           String         @map("external_id")
+  name                 String
+  pluginVersion        String?        @map("plugin_version")
+  agentVersion         String?        @map("agent_version")
+  apiVersion           String         @default("v1") @map("api_version")
+  capabilityFlags      Json           @default("{}") @map("capability_flags")
+  catalogHash          String         @map("catalog_hash")
+  toolsRegisteredCount Int            @default(0) @map("tools_registered_count")
+  activeRulesCount     Int            @default(0) @map("active_rules_count")
+  status               agent_status_t @default(active)
+  firstSeenAt          DateTime       @default(now()) @map("first_seen_at") @db.Timestamptz
+  lastSeenAt           DateTime       @default(now()) @map("last_seen_at") @db.Timestamptz
+  createdAt            DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime       @updatedAt @map("updated_at") @db.Timestamptz
+
+  account     Account          @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  tools       AgentTool[]
+  rules       Rule[]
+  auditEvents RuleAuditEvent[]
+  evaluations EvaluationEvent[]
+
+  @@unique([accountId, source, externalId], map: "uq_agents_account_source_external")
+  @@index([accountId], map: "idx_agents_account_id")
+  @@index([lastSeenAt(sort: Desc)], map: "idx_agents_last_seen_at")
+  @@map("agents")
+}
+
+model AgentTool {
+  id          String          @id @default(uuid()) @db.Uuid
+  agentId     String          @map("agent_id") @db.Uuid
+  toolName    String          @map("tool_name")
+  actionClass action_class_t? @map("action_class")
+  inputSchema Json?           @map("input_schema")
+  isActive    Boolean         @default(true) @map("is_active")
+  firstSeenAt DateTime        @default(now()) @map("first_seen_at") @db.Timestamptz
+  lastSeenAt  DateTime        @default(now()) @map("last_seen_at") @db.Timestamptz
+  createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime        @updatedAt @map("updated_at") @db.Timestamptz
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([agentId, actionClass], map: "idx_agent_tools_agent_action_class")
+  @@index([agentId, isActive], map: "idx_agent_tools_agent_is_active")
+  @@map("agent_tools")
+}
+
+model Rule {
+  id                      String              @id @default(uuid()) @db.Uuid
+  publicId                String              @unique @map("public_id")
+  accountId               String              @map("account_id") @db.Uuid
+  agentId                 String              @map("agent_id") @db.Uuid
+  type                    rule_type_t
+  status                  rule_status_t       @default(active)
+  spec                    Json
+  normalizedFingerprint   String              @map("normalized_fingerprint")
+  toolMatch               String?             @map("tool_match")
+  targetKind              rule_target_t?      @map("target_kind")
+  targetValue             String?             @map("target_value")
+  targetValueNormalized   String?             @map("target_value_normalized")
+  thresholdMax            Int?                @map("threshold_max")
+  thresholdPeriod         threshold_period_t? @map("threshold_period")
+  createdVia              actor_type_t        @default(api_key) @map("created_via")
+  createdByApiKeyId       String?             @map("created_by_api_key_id") @db.Uuid
+  createdByUserId         String?             @map("created_by_user_id")
+  createdAt               DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt               DateTime            @updatedAt @map("updated_at") @db.Timestamptz
+  disabledAt              DateTime?           @map("disabled_at") @db.Timestamptz
+  removedAt               DateTime?           @map("removed_at") @db.Timestamptz
+
+  account        Account          @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  agent          Agent            @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  createdByApiKey ApiKey?         @relation("RuleCreatedByApiKey", fields: [createdByApiKeyId], references: [id], onDelete: SetNull)
+  auditEvents    RuleAuditEvent[]
+  evaluations    EvaluationEvent[]
+
+  @@index([agentId, type, status], map: "idx_rules_agent_type_status")
+  @@index([accountId], map: "idx_rules_account_id")
+  @@map("rules")
+}
+
+model RuleAuditEvent {
+  id            String            @id @default(uuid()) @db.Uuid
+  accountId     String            @map("account_id") @db.Uuid
+  agentId       String            @map("agent_id") @db.Uuid
+  ruleId        String            @map("rule_id") @db.Uuid
+  eventType     rule_event_type_t @map("event_type")
+  actorType     actor_type_t      @map("actor_type")
+  actorApiKeyId String?           @map("actor_api_key_id") @db.Uuid
+  actorUserId   String?           @map("actor_user_id")
+  snapshot      Json
+  createdAt     DateTime          @default(now()) @map("created_at") @db.Timestamptz
+
+  account       Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  agent         Agent   @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  rule          Rule    @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  actorApiKey   ApiKey?  @relation("AuditActorApiKey", fields: [actorApiKeyId], references: [id], onDelete: SetNull)
+
+  @@index([ruleId, createdAt(sort: Desc)], map: "idx_rule_audit_events_rule_created")
+  @@index([agentId, createdAt(sort: Desc)], map: "idx_rule_audit_events_agent_created")
+  @@index([accountId, createdAt(sort: Desc)], map: "idx_rule_audit_events_account_created")
+  @@map("rule_audit_events")
+}
+
+model UsagePeriod {
+  id                    String      @id @default(uuid()) @db.Uuid
+  accountId             String      @map("account_id") @db.Uuid
+  periodStart           DateTime    @map("period_start") @db.Date
+  periodEnd             DateTime    @map("period_end") @db.Date
+  evaluationsUsed       Int         @default(0) @map("evaluations_used")
+  blocksStored          Int         @default(0) @map("blocks_stored")
+  allowsStoredSampled   Int         @default(0) @map("allows_stored_sampled")
+  rulesCreatedTotal     Int         @default(0) @map("rules_created_total")
+  rulesCreatedAfterCap  Int         @default(0) @map("rules_created_after_cap")
+  agentsRegistered      Int         @default(0) @map("agents_registered")
+  mode                  eval_mode_t @default(normal)
+  createdAt             DateTime    @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt             DateTime    @updatedAt @map("updated_at") @db.Timestamptz
+
+  account     Account           @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  evaluations EvaluationEvent[]
+
+  @@unique([accountId, periodStart], map: "uq_usage_periods_account_period_start")
+  @@index([accountId, mode], map: "idx_usage_periods_account_mode")
+  @@map("usage_periods")
+}
+
+model EvaluationEvent {
+  id              String          @id @default(uuid()) @db.Uuid
+  publicId        String          @unique @map("public_id")
+  accountId       String          @map("account_id") @db.Uuid
+  agentId         String          @map("agent_id") @db.Uuid
+  apiKeyId        String?         @map("api_key_id") @db.Uuid
+  matchedRuleId   String?         @map("matched_rule_id") @db.Uuid
+  usagePeriodId   String          @map("usage_period_id") @db.Uuid
+  decision        decision_t
+  mode            eval_mode_t
+  reasonCode      reason_code_t?  @map("reason_code")
+  message         String?
+  sessionId       String          @map("session_id")
+  sessionKey      String?         @map("session_key")
+  channelProvider String?         @map("channel_provider")
+  channelType     channel_type_t  @default(unknown) @map("channel_type")
+  toolName        String          @map("tool_name")
+  actionClass     action_class_t? @map("action_class")
+  targets         Json?
+  scope           Json?
+  rawInput        Json?           @map("raw_input")
+  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz
+
+  account     Account      @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  agent       Agent        @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  apiKey      ApiKey?      @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
+  matchedRule Rule?        @relation(fields: [matchedRuleId], references: [id], onDelete: SetNull)
+  usagePeriod UsagePeriod  @relation(fields: [usagePeriodId], references: [id], onDelete: Cascade)
+
+  @@index([agentId, createdAt(sort: Desc)], map: "idx_evaluation_events_agent_created")
+  @@index([accountId, createdAt(sort: Desc)], map: "idx_evaluation_events_account_created")
+  @@index([matchedRuleId, createdAt(sort: Desc)], map: "idx_evaluation_events_matched_rule_created")
+  @@index([usagePeriodId], map: "idx_evaluation_events_usage_period")
+  @@map("evaluation_events")
+}
