@@ -1,0 +1,30 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum portal_role_t {
+  user
+  admin
+  super_admin
+}
+
+model PortalUser {
+  id                String        @id @default(uuid()) @db.Uuid
+  email             String        @unique
+  name              String?
+  image             String?
+  role              portal_role_t @default(user)
+  googleId          String        @unique @map("google_id")
+  openclawAccountId String?       @map("openclaw_account_id")
+  isBlocked         Boolean       @default(false) @map("is_blocked")
+  createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+  lastLoginAt       DateTime?     @map("last_login_at") @db.Timestamptz
+
+  @@map("portal_users")
+}
