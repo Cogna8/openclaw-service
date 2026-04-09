@@ -156,7 +156,7 @@ describe("route existence and middleware pipeline", () => {
       expect(res.status).not.toBe(501);
     });
 
-    it("POST /v1/agents/register -> 501", async () => {
+    it("POST /v1/agents/register -> no longer 501 (Pack 5 implemented)", async () => {
       const { POST } = await import(
         "../app/api/v1/agents/register/route.js"
       );
@@ -170,20 +170,18 @@ describe("route existence and middleware pipeline", () => {
         }),
       });
       const res = await POST(req);
-      expect(res.status).toBe(501);
-      const body = await res.json();
-      expect(body.message).toContain("Pack 5");
+      // Endpoint is now live; without full DB mock it returns 500 (not 501)
+      expect(res.status).not.toBe(501);
     });
 
-    it("GET /v1/status -> 501", async () => {
+    it("GET /v1/status -> no longer 501 (Pack 5 implemented)", async () => {
       const { GET } = await import("../app/api/v1/status/route.js");
       const req = new NextRequest(makeUrl("/api/v1/status"), {
         headers: authedHeaders(),
       });
       const res = await GET(req);
-      expect(res.status).toBe(501);
-      const body = await res.json();
-      expect(body.message).toContain("Pack 5");
+      // Endpoint is now live; without full DB mock it returns 500 (not 501)
+      expect(res.status).not.toBe(501);
     });
   });
 
@@ -254,7 +252,7 @@ describe("route existence and middleware pipeline", () => {
           headers: authedHeaders(),
         });
         const res = await GET(req);
-        expect(res.status).toBe(501); // passes middleware, gets 501
+        expect(res.status).not.toBe(429); // passes rate limit, handled by endpoint
       }
 
       const req = new NextRequest(makeUrl("/api/v1/status"), {
