@@ -53,7 +53,7 @@ describe("Account and API key basics", () => {
     expect(account.plan).toBe("free");
     expect(account.status).toBe("active");
     expect(account.evaluationsLimitMonthly).toBe(10000);
-    expect(account.maxAgents).toBe(3);
+    expect(account.maxAgents).toBe(10);
     expect(account.maxRulesPerAgent).toBe(25);
     expect(account.postCapNewRulesLimit).toBe(3);
     expect(account.apiVersion).toBe("v1");
