@@ -10,13 +10,33 @@ export type ResolvedAgent = {
 
 export async function resolveAgentForAccount(
   accountId: string,
-  agentPublicId: string,
+  agentIdentifier: string,
 ): Promise<ResolvedAgent> {
   const db = getDb();
-  const agent = await db.agent.findFirst({
-    where: { publicId: agentPublicId },
-    select: { id: true, publicId: true, accountId: true, catalogHash: true, status: true },
-  });
+
+  const select = {
+    id: true,
+    publicId: true,
+    accountId: true,
+    catalogHash: true,
+    status: true,
+  } as const;
+
+  const isPublicId = agentIdentifier.startsWith("agt_");
+
+  const agent = isPublicId
+    ? await db.agent.findFirst({
+        where: { publicId: agentIdentifier },
+        select,
+      })
+    : await db.agent.findFirst({
+        where: {
+          accountId,
+          source: "openclaw",
+          externalId: agentIdentifier,
+        },
+        select,
+      });
 
   if (!agent || agent.accountId !== accountId || agent.status === "archived") {
     throw new NotFoundError("Agent not found");
