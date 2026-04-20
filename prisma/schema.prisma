@@ -126,7 +126,7 @@ model Account {
   plan                     plan_t           @default(free)
   status                   account_status_t @default(active)
   evaluationsLimitMonthly  Int              @default(10000) @map("evaluations_limit_monthly")
-  maxAgents                Int              @default(3) @map("max_agents")
+  maxAgents                Int              @default(10) @map("max_agents")
   maxRulesPerAgent         Int              @default(25) @map("max_rules_per_agent")
   postCapNewRulesLimit     Int              @default(3) @map("post_cap_new_rules_limit")
   apiVersion               String           @default("v1") @map("api_version")
