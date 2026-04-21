@@ -57,3 +57,4 @@ All enums, check constraints, partial indexes, and unique constraints are define
 - The migration is a single raw SQL file that creates all enums, tables, constraints, and indexes.
 - Hot-path evaluation queries use normalized columns only (`toolMatch`, `targetKind`, `targetValueNormalized`, `thresholdMax`, `thresholdPeriod`), never `spec`.
 - `lookupHash` and `secretHash` use the same SHA-256 algorithm in V1. Dual columns exist for future bcrypt/argon2 upgrade on `secretHash`.
+
