@@ -110,37 +110,66 @@ export async function enablePolicyForAccount(input: {
   if (!isValidTemplateId(input.templateId)) {
     throw new NotFoundError("Unknown policy template");
   }
+
   const template = getTemplate(input.templateId) as PolicyTemplate;
   const db = getDb();
 
   const result = await db.$transaction(async (tx: any) => {
-    // Upsert enablement
-    await tx.accountPolicyEnablement.upsert({
+    const existing = await tx.accountPolicyEnablement.findFirst({
       where: {
-        accountId_templateId: {
-          accountId: input.accountId,
-          templateId: input.templateId,
-        },
-      },
-      create: {
         accountId: input.accountId,
         templateId: input.templateId,
-        enabledByUserId: input.actorUserId,
       },
-      update: {
-        // Refresh enabledAt and actor on re-enable
-        enabledAt: new Date(),
-        enabledByUserId: input.actorUserId,
-      },
+      select: { id: true },
     });
 
-    const materializeResult = await materializeTemplateForAccount(tx, {
+    if (existing) {
+      await tx.accountPolicyEnablement.update({
+        where: { id: existing.id },
+        data: {
+          enabledAt: new Date(),
+          enabledByUserId: input.actorUserId,
+        },
+      });
+    } else {
+      try {
+        await tx.accountPolicyEnablement.create({
+          data: {
+            accountId: input.accountId,
+            templateId: input.templateId,
+            enabledByUserId: input.actorUserId,
+          },
+        });
+      } catch (err: any) {
+        // Race-safe fallback: if a concurrent request created the row
+        // after our findFirst, refresh it inside the same tx.
+        if (err?.code === "P2002") {
+          const concurrent = await tx.accountPolicyEnablement.findFirst({
+            where: {
+              accountId: input.accountId,
+              templateId: input.templateId,
+            },
+            select: { id: true },
+          });
+          if (!concurrent) throw err;
+          await tx.accountPolicyEnablement.update({
+            where: { id: concurrent.id },
+            data: {
+              enabledAt: new Date(),
+              enabledByUserId: input.actorUserId,
+            },
+          });
+        } else {
+          throw err;
+        }
+      }
+    }
+
+    return materializeTemplateForAccount(tx, {
       accountId: input.accountId,
       template,
       actorUserId: input.actorUserId,
     });
-
-    return materializeResult;
   });
 
   return {

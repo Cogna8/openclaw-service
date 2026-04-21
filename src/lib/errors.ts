@@ -82,13 +82,28 @@ export class NotImplementedError extends ApiError {
   }
 }
 
-export function handleApiError(error: unknown): NextResponse {
+export function handleApiError(
+  error: unknown,
+  context?: Record<string, unknown>,
+): NextResponse {
   if (error instanceof ApiError) {
     return error.toResponse();
   }
-  console.error("[openclaw-service] Unhandled error:", error instanceof Error ? error.message : error);
-  if (error instanceof Error && error.stack) {
-    console.error(error.stack);
+
+  const detail = {
+    event: "unhandled_api_error",
+    message: error instanceof Error ? error.message : String(error),
+    stack: error instanceof Error ? error.stack : undefined,
+    ...context,
+  };
+
+  try {
+    console.error("[openclaw-service]", JSON.stringify(detail));
+  } catch {
+    // Fallback if context contains non-serializable values (circular refs etc)
+    console.error("[openclaw-service] Unhandled error:", detail.message);
+    if (detail.stack) console.error(detail.stack);
   }
+
   return new ServerError().toResponse();
 }
