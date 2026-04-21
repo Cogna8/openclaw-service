@@ -116,63 +116,66 @@ export async function enablePolicyForAccount(input: {
   const template = getTemplate(input.templateId) as PolicyTemplate;
   const db = getDb();
 
-  const result = await db.$transaction(async (tx: any) => {
-    const existing = await tx.accountPolicyEnablement.findFirst({
-      where: {
-        accountId: input.accountId,
-        templateId: input.templateId,
-      },
-      select: { id: true },
-    });
-
-    if (existing) {
-      await tx.accountPolicyEnablement.update({
-        where: { id: existing.id },
-        data: {
-          enabledAt: new Date(),
-          enabledByUserId: input.actorUserId,
+  const result = await db.$transaction(
+    async (tx: any) => {
+      const existing = await tx.accountPolicyEnablement.findFirst({
+        where: {
+          accountId: input.accountId,
+          templateId: input.templateId,
         },
+        select: { id: true },
       });
-    } else {
-      try {
-        await tx.accountPolicyEnablement.create({
+
+      if (existing) {
+        await tx.accountPolicyEnablement.update({
+          where: { id: existing.id },
           data: {
-            accountId: input.accountId,
-            templateId: input.templateId,
+            enabledAt: new Date(),
             enabledByUserId: input.actorUserId,
           },
         });
-      } catch (err: any) {
-        // Race-safe fallback: if a concurrent request created the row
-        // after our findFirst, refresh it inside the same tx.
-        if (err?.code === "P2002") {
-          const concurrent = await tx.accountPolicyEnablement.findFirst({
-            where: {
+      } else {
+        try {
+          await tx.accountPolicyEnablement.create({
+            data: {
               accountId: input.accountId,
               templateId: input.templateId,
-            },
-            select: { id: true },
-          });
-          if (!concurrent) throw err;
-          await tx.accountPolicyEnablement.update({
-            where: { id: concurrent.id },
-            data: {
-              enabledAt: new Date(),
               enabledByUserId: input.actorUserId,
             },
           });
-        } else {
-          throw err;
+        } catch (err: any) {
+          // Race-safe fallback: if a concurrent request created the row
+          // after our findFirst, refresh it inside the same tx.
+          if (err?.code === "P2002") {
+            const concurrent = await tx.accountPolicyEnablement.findFirst({
+              where: {
+                accountId: input.accountId,
+                templateId: input.templateId,
+              },
+              select: { id: true },
+            });
+            if (!concurrent) throw err;
+            await tx.accountPolicyEnablement.update({
+              where: { id: concurrent.id },
+              data: {
+                enabledAt: new Date(),
+                enabledByUserId: input.actorUserId,
+              },
+            });
+          } else {
+            throw err;
+          }
         }
       }
-    }
 
-    return materializeTemplateForAccount(tx, {
-      accountId: input.accountId,
-      template,
-      actorUserId: input.actorUserId,
-    });
-  });
+      return materializeTemplateForAccount(tx, {
+        accountId: input.accountId,
+        template,
+        actorUserId: input.actorUserId,
+      });
+    },
+    { maxWait: 10_000, timeout: 30_000 },
+  );
 
   return {
     template_id: input.templateId,
@@ -198,24 +201,27 @@ export async function disablePolicyForAccount(input: {
   }
   const db = getDb();
 
-  const result = await db.$transaction(async (tx: any) => {
-    const deleted = await tx.accountPolicyEnablement.deleteMany({
-      where: {
+  const result = await db.$transaction(
+    async (tx: any) => {
+      const deleted = await tx.accountPolicyEnablement.deleteMany({
+        where: {
+          accountId: input.accountId,
+          templateId: input.templateId,
+        },
+      });
+
+      if (deleted.count === 0) {
+        // Already disabled — still run remove in case stale rules exist
+      }
+
+      return removeTemplateRulesForAccount(tx, {
         accountId: input.accountId,
         templateId: input.templateId,
-      },
-    });
-
-    if (deleted.count === 0) {
-      // Already disabled — still run remove in case stale rules exist
-    }
-
-    return removeTemplateRulesForAccount(tx, {
-      accountId: input.accountId,
-      templateId: input.templateId,
-      actorUserId: input.actorUserId,
-    });
-  });
+        actorUserId: input.actorUserId,
+      });
+    },
+    { maxWait: 10_000, timeout: 30_000 },
+  );
 
   return {
     template_id: input.templateId,
