@@ -23,7 +23,7 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitest/runner": "^4.1.3",
-    "prisma": "^7.7.0",
+    "prisma": "^6.19.0",
     "typescript": "^6.0.2",
     "vitest": "^4.1.3"
   },
@@ -32,10 +32,9 @@
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",
-    "@prisma/adapter-neon": "^7.7.0",
-    "@prisma/adapter-pg": "^7.7.0",
-    "@prisma/client": "^7.7.0",
-    "@prisma/client-runtime-utils": "^7.7.0",
+    "@prisma/adapter-neon": "^6.19.0",
+    "@prisma/adapter-pg": "^6.19.0",
+    "@prisma/client": "^6.19.0",
     "dotenv": "^17.4.1",
     "nanoid": "^3.3.11",
     "next": "^16.2.2",
