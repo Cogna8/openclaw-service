@@ -10,6 +10,13 @@ if (env !== "production") {
   process.exit(0);
 }
 
+if (!process.env.DATABASE_URL) {
+  console.error(
+    "[migrate-on-deploy] DATABASE_URL is not set; cannot run prisma migrate deploy",
+  );
+  process.exit(1);
+}
+
 console.log(
   "[migrate-on-deploy] production deploy detected; running prisma migrate deploy",
 );
