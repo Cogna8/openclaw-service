@@ -3,6 +3,7 @@ import { generateAgentId } from "../lib/ids.js";
 import { ValidationError } from "../lib/errors.js";
 import { getOrCreateCurrentUsagePeriod } from "./usage-manager.js";
 import { invalidateAgentRules } from "./rule-cache.js";
+import { materializeEnabledPoliciesForAgent } from "./policy-materializer.js";
 
 export type RegisterAgentInput = {
   accountId: string;
@@ -111,13 +112,28 @@ async function createNewAgent(
       data: { agentsRegistered: { increment: 1 } },
     });
 
+    // Materialize any account-level enabled policies as rules on the new agent.
+    // Runs inside the same transaction so agent creation and rule provisioning
+    // either both commit or both roll back.
+    await materializeEnabledPoliciesForAgent(tx, {
+      accountId,
+      agentId: created.id,
+      agentPublicId: created.publicId,
+    });
+
     return created;
   });
 
+  // Re-read agent to pick up activeRulesCount updated by materializer
+  const finalAgent = await db.agent.findUniqueOrThrow({
+    where: { id: agent.id },
+    select: { publicId: true, activeRulesCount: true },
+  });
+
   return {
-    agent: { id: agent.publicId, status: "created" },
+    agent: { id: finalAgent.publicId, status: "created" },
     tools_registered: tools.length,
-    active_rules: agent.activeRulesCount,
+    active_rules: finalAgent.activeRulesCount,
   };
 }
 
@@ -214,12 +230,31 @@ async function updateExistingAgent(
       invalidateAgentRules(existing.id);
     }
 
+    // If the agent was archived and is now reactivating, materialize any
+    // account-level enabled policies onto it. The materializer is idempotent
+    // (fingerprint-based), so if the agent already has the template rules
+    // from a previous life they are left untouched.
+    const wasReactivated = existing.status === "archived";
+    if (wasReactivated) {
+      await materializeEnabledPoliciesForAgent(tx, {
+        accountId,
+        agentId: existing.id,
+        agentPublicId: existing.publicId,
+      });
+    }
+
     return updated;
   });
 
+  // Re-read to pick up activeRulesCount updated by materializer on reactivation
+  const finalAgent = await db.agent.findUniqueOrThrow({
+    where: { id: agent.id },
+    select: { publicId: true, toolsRegisteredCount: true, activeRulesCount: true },
+  });
+
   return {
-    agent: { id: agent.publicId, status: "synced" },
-    tools_registered: agent.toolsRegisteredCount,
-    active_rules: agent.activeRulesCount,
+    agent: { id: finalAgent.publicId, status: "synced" },
+    tools_registered: finalAgent.toolsRegisteredCount,
+    active_rules: finalAgent.activeRulesCount,
   };
 }

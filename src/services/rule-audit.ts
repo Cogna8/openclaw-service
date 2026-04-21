@@ -3,8 +3,9 @@ export type CreateAuditArgs = {
   agentId: string;
   ruleId: string;
   eventType: "created" | "enabled" | "disabled" | "removed";
-  actorType: "api_key";
-  actorApiKeyId: string;
+  actorType: "api_key" | "system" | "console_user";
+  actorApiKeyId?: string | null;
+  actorUserId?: string | null;
   snapshot: Record<string, unknown>;
 };
 
@@ -19,7 +20,8 @@ export async function createRuleAuditEvent(
       ruleId: args.ruleId,
       eventType: args.eventType,
       actorType: args.actorType,
-      actorApiKeyId: args.actorApiKeyId,
+      actorApiKeyId: args.actorApiKeyId ?? null,
+      actorUserId: args.actorUserId ?? null,
       snapshot: args.snapshot,
     },
   });

@@ -134,16 +134,31 @@ model Account {
   createdAt                DateTime         @default(now()) @map("created_at") @db.Timestamptz
   updatedAt                DateTime         @updatedAt @map("updated_at") @db.Timestamptz
 
-  apiKeys      ApiKey[]
-  agents       Agent[]
-  rules        Rule[]
-  auditEvents  RuleAuditEvent[]
-  usagePeriods UsagePeriod[]
-  evaluations  EvaluationEvent[]
+  apiKeys            ApiKey[]
+  agents             Agent[]
+  rules              Rule[]
+  auditEvents        RuleAuditEvent[]
+  usagePeriods       UsagePeriod[]
+  evaluations        EvaluationEvent[]
+  policyEnablements  AccountPolicyEnablement[]
 
   @@index([ownerUserId], map: "idx_accounts_owner_user_id")
   @@index([plan, status], map: "idx_accounts_plan_status")
   @@map("accounts")
+}
+
+model AccountPolicyEnablement {
+  id               String   @id @default(uuid()) @db.Uuid
+  accountId        String   @map("account_id") @db.Uuid
+  templateId       String   @map("template_id")
+  enabledAt        DateTime @default(now()) @map("enabled_at") @db.Timestamptz
+  enabledByUserId  String?  @map("enabled_by_user_id")
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, templateId], map: "uq_account_policy_enablements_account_template")
+  @@index([accountId], map: "idx_account_policy_enablements_account_id")
+  @@map("account_policy_enablements")
 }
 
 model ApiKey {
@@ -243,6 +258,7 @@ model Rule {
   createdVia              actor_type_t        @default(api_key) @map("created_via")
   createdByApiKeyId       String?             @map("created_by_api_key_id") @db.Uuid
   createdByUserId         String?             @map("created_by_user_id")
+  sourceTemplate          String?             @map("source_template")
   createdAt               DateTime            @default(now()) @map("created_at") @db.Timestamptz
   updatedAt               DateTime            @updatedAt @map("updated_at") @db.Timestamptz
   disabledAt              DateTime?           @map("disabled_at") @db.Timestamptz
@@ -256,6 +272,7 @@ model Rule {
 
   @@index([agentId, type, status], map: "idx_rules_agent_type_status")
   @@index([accountId], map: "idx_rules_account_id")
+  @@index([accountId, sourceTemplate], map: "idx_rules_account_source_template")
   @@map("rules")
 }
 
