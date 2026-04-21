@@ -20,6 +20,8 @@ import {
   materializeTemplateForAccount,
   removeTemplateRulesForAccount,
 } from "./policy-materializer.js";
+import { createRuleAuditEvent } from "./rule-audit.js";
+import { invalidateAgentRules } from "./rule-cache.js";
 
 export type PolicyVariantRule = {
   public_id: string;
@@ -291,7 +293,6 @@ export async function deleteTemplateRule(input: {
     });
 
     // Keep audit trail consistent with other rule removals
-    const { createRuleAuditEvent } = await import("./rule-audit.js");
     await createRuleAuditEvent(tx, {
       accountId: input.accountId,
       agentId: rule.agentId,
@@ -320,7 +321,6 @@ export async function deleteTemplateRule(input: {
       data: { activeRulesCount: activeCount },
     });
 
-    const { invalidateAgentRules } = await import("./rule-cache.js");
     invalidateAgentRules(rule.agentId);
   });
 
