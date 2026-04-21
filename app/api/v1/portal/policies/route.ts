@@ -4,11 +4,17 @@ import { listPoliciesForAccount } from "../../../../../src/services/policy-crud.
 import { handleApiError } from "../../../../../src/lib/errors.js";
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
+  let auth: Awaited<ReturnType<typeof authenticatePortalRequest>> | undefined;
+
   try {
-    const auth = await authenticatePortalRequest(req);
+    auth = await authenticatePortalRequest(req);
     const policies = await listPoliciesForAccount(auth.accountId);
     return NextResponse.json({ policies }, { status: 200 });
   } catch (error) {
-    return handleApiError(error);
+    return handleApiError(error, {
+      route: "GET /api/v1/portal/policies",
+      accountId: auth?.accountId,
+      userId: auth?.userId,
+    });
   }
 }

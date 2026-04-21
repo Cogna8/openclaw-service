@@ -7,16 +7,26 @@ export async function DELETE(
   req: NextRequest,
   context: { params: Promise<{ rulePublicId: string }> },
 ): Promise<NextResponse> {
+  let auth: Awaited<ReturnType<typeof authenticatePortalRequest>> | undefined;
+  let rulePublicId: string | undefined;
+
   try {
-    const auth = await authenticatePortalRequest(req);
-    const { rulePublicId } = await context.params;
+    auth = await authenticatePortalRequest(req);
+    ({ rulePublicId } = await context.params);
+
     const result = await deleteTemplateRule({
       accountId: auth.accountId,
       rulePublicId,
       actorUserId: auth.userId,
     });
+
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
-    return handleApiError(error);
+    return handleApiError(error, {
+      route: "DELETE /api/v1/portal/rules/:rulePublicId",
+      rulePublicId,
+      accountId: auth?.accountId,
+      userId: auth?.userId,
+    });
   }
 }

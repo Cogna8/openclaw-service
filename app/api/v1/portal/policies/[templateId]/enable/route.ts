@@ -7,16 +7,26 @@ export async function POST(
   req: NextRequest,
   context: { params: Promise<{ templateId: string }> },
 ): Promise<NextResponse> {
+  let auth: Awaited<ReturnType<typeof authenticatePortalRequest>> | undefined;
+  let templateId: string | undefined;
+
   try {
-    const auth = await authenticatePortalRequest(req);
-    const { templateId } = await context.params;
+    auth = await authenticatePortalRequest(req);
+    ({ templateId } = await context.params);
+
     const result = await enablePolicyForAccount({
       accountId: auth.accountId,
       templateId,
       actorUserId: auth.userId,
     });
+
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
-    return handleApiError(error);
+    return handleApiError(error, {
+      route: "POST /api/v1/portal/policies/:templateId/enable",
+      templateId,
+      accountId: auth?.accountId,
+      userId: auth?.userId,
+    });
   }
 }
