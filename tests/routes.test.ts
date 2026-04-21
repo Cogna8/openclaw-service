@@ -43,8 +43,7 @@ describe("route existence and middleware pipeline", () => {
   describe("GET / (health check)", () => {
     it("returns 200 with service info (no auth required)", async () => {
       const { GET } = await import("../app/route.js");
-      const req = new NextRequest(makeUrl("/"));
-      const res = await GET(req);
+      const res = await GET();
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.service).toBe("cogna8-openclaw-eval-service");
