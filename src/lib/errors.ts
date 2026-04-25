@@ -70,6 +70,12 @@ export class ConflictError extends ApiError {
   }
 }
 
+export class GoneError extends ApiError {
+  constructor(message = "Gone") {
+    super(410, "gone", message);
+  }
+}
+
 export class ServerError extends ApiError {
   constructor(message = "Internal server error") {
     super(500, "server_error", message);

@@ -4,12 +4,18 @@ import { NextRequest } from "next/server";
 // Mock getDb for auth
 const mockFindFirst = vi.fn();
 const mockUpdate = vi.fn().mockResolvedValue({});
+const mockEvaluationEventFindFirst = vi.fn();
+const mockEvaluationEventUpdate = vi.fn();
 
 vi.mock("../src/lib/db.js", () => ({
   getDb: () => ({
     apiKey: {
       findFirst: mockFindFirst,
       update: mockUpdate,
+    },
+    evaluationEvent: {
+      findFirst: mockEvaluationEventFindFirst,
+      update: mockEvaluationEventUpdate,
     },
   }),
 }));
@@ -262,5 +268,121 @@ describe("route existence and middleware pipeline", () => {
       const body = await res.json();
       expect(body.error).toBe("rate_limit_exceeded");
     });
+  });
+});
+
+describe("POST /api/v1/decisions/:id/resolve", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    _resetRateLimitState();
+    mockFindFirst.mockResolvedValue({
+      id: "key-uuid",
+      publicId: "key_1234",
+      accountId: "acct-uuid",
+    });
+  });
+
+  function makeReq(body: unknown): NextRequest {
+    return new NextRequest(makeUrl("/api/v1/decisions/ev_abc/resolve"), {
+      method: "POST",
+      headers: authedHeaders("application/json"),
+      body: JSON.stringify(body),
+    });
+  }
+
+  async function callResolve(id: string, body: unknown) {
+    const mod = await import("../app/api/v1/decisions/[id]/resolve/route.js");
+    return mod.POST(makeReq(body), {
+      params: Promise.resolve({ id }),
+    });
+  }
+
+  it("#1 allow_once -> 200 and DB row updated", async () => {
+    mockEvaluationEventFindFirst.mockResolvedValue({
+      id: "internal-uuid",
+      publicId: "ev_abc",
+      decision: "confirm",
+      resolution: null,
+      resolvedAt: null,
+      createdAt: new Date(),
+    });
+    mockEvaluationEventUpdate.mockResolvedValue({});
+    const res = await callResolve("ev_abc", { resolution: "allow_once" });
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.ok).toBe(true);
+    expect(mockEvaluationEventUpdate).toHaveBeenCalledWith({
+      where: { id: "internal-uuid" },
+      data: expect.objectContaining({ resolution: "allow_once" }),
+    });
+  });
+
+  it("#2 same resolution replay -> 200 idempotent, no DB write", async () => {
+    mockEvaluationEventFindFirst.mockResolvedValue({
+      id: "internal-uuid",
+      publicId: "ev_abc",
+      decision: "confirm",
+      resolution: "allow_once",
+      resolvedAt: new Date(),
+      createdAt: new Date(),
+    });
+    const res = await callResolve("ev_abc", { resolution: "allow_once" });
+    expect(res.status).toBe(200);
+    expect(mockEvaluationEventUpdate).not.toHaveBeenCalled();
+  });
+
+  it("#3 different resolution after resolved -> 409 already_resolved", async () => {
+    mockEvaluationEventFindFirst.mockResolvedValue({
+      id: "internal-uuid",
+      publicId: "ev_abc",
+      decision: "confirm",
+      resolution: "allow_once",
+      resolvedAt: new Date(),
+      createdAt: new Date(),
+    });
+    const res = await callResolve("ev_abc", { resolution: "deny" });
+    expect(res.status).toBe(409);
+    const json = await res.json();
+    expect(json.error).toBe("already_resolved");
+    expect(json.resolution).toBe("allow_once");
+  });
+
+  it("#4 unknown id -> 404", async () => {
+    mockEvaluationEventFindFirst.mockResolvedValue(null);
+    const res = await callResolve("ev_missing", { resolution: "deny" });
+    expect(res.status).toBe(404);
+  });
+
+  it("#5 cross-account row -> 404 (findFirst scoped by accountId returns null)", async () => {
+    mockEvaluationEventFindFirst.mockResolvedValue(null);
+    const res = await callResolve("ev_other", { resolution: "deny" });
+    expect(res.status).toBe(404);
+  });
+
+  it("#6 non-confirm event (decision=block) -> 404", async () => {
+    mockEvaluationEventFindFirst.mockResolvedValue({
+      id: "internal-uuid",
+      publicId: "ev_abc",
+      decision: "block",
+      resolution: null,
+      resolvedAt: null,
+      createdAt: new Date(),
+    });
+    const res = await callResolve("ev_abc", { resolution: "deny" });
+    expect(res.status).toBe(404);
+  });
+
+  it("#7 older than 24h -> 410 gone", async () => {
+    const old = new Date(Date.now() - 25 * 60 * 60 * 1000);
+    mockEvaluationEventFindFirst.mockResolvedValue({
+      id: "internal-uuid",
+      publicId: "ev_abc",
+      decision: "confirm",
+      resolution: null,
+      resolvedAt: null,
+      createdAt: old,
+    });
+    const res = await callResolve("ev_abc", { resolution: "deny" });
+    expect(res.status).toBe(410);
   });
 });

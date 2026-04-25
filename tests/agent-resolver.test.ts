@@ -45,6 +45,7 @@ describe("resolveAgentForAccount", () => {
         accountId: true,
         catalogHash: true,
         status: true,
+        pluginVersion: true,
       },
     });
     expect(resolved).toEqual({
@@ -52,6 +53,7 @@ describe("resolveAgentForAccount", () => {
       publicId: AGENT_ROW.publicId,
       accountId: AGENT_ROW.accountId,
       catalogHash: AGENT_ROW.catalogHash,
+      pluginVersion: null,
     });
   });
 
@@ -68,6 +70,7 @@ describe("resolveAgentForAccount", () => {
         accountId: true,
         catalogHash: true,
         status: true,
+        pluginVersion: true,
       },
     });
     expect(resolved.publicId).toBe("agt_VA8FoJ9o");
