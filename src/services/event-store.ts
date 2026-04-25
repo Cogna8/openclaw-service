@@ -25,7 +25,7 @@ export type StoreEventArgs = {
   apiKeyId: string;
   usagePeriodId: string;
   matchedRuleId: string | null;
-  decision: "allow" | "block";
+  decision: "allow" | "block" | "confirm";
   mode: "normal" | "degraded";
   reasonCode: string | null;
   message: string | null;

@@ -6,6 +6,7 @@ export type ResolvedAgent = {
   publicId: string;
   accountId: string;
   catalogHash: string;
+  pluginVersion: string | null;
 };
 
 export async function resolveAgentForAccount(
@@ -20,6 +21,7 @@ export async function resolveAgentForAccount(
     accountId: true,
     catalogHash: true,
     status: true,
+    pluginVersion: true,
   } as const;
 
   const isPublicId = agentIdentifier.startsWith("agt_");
@@ -42,7 +44,6 @@ export async function resolveAgentForAccount(
     throw new NotFoundError("Agent not found");
   }
 
-  // Update lastSeenAt asynchronously — never fail the request path
   db.agent.update({
     where: { id: agent.id },
     data: { lastSeenAt: new Date() },
@@ -53,5 +54,6 @@ export async function resolveAgentForAccount(
     publicId: agent.publicId,
     accountId: agent.accountId,
     catalogHash: agent.catalogHash,
+    pluginVersion: agent.pluginVersion ?? null,
   };
 }
