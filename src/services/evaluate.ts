@@ -9,6 +9,8 @@ import {
 } from "./usage-manager.js";
 import { shouldStoreAllowSample, storeEvaluationEvent } from "./event-store.js";
 import { normalizePath } from "../lib/rule-normalization.js";
+import { buildConfirmPrompt, type ConfirmPromptPayload } from "./confirm-prompt.js";
+import { semverLtOrInvalid } from "../lib/semver-compare.js";
 
 export type EvaluateInput = {
   accountId: string;
@@ -28,7 +30,7 @@ export type EvaluateInput = {
 };
 
 export type EvaluateResult = {
-  decision: "allow" | "block";
+  decision: "allow" | "block" | "confirm";
   mode: "normal" | "degraded";
   rule: null | { id: string; type: string };
   reason_code: null | string;
@@ -37,6 +39,10 @@ export type EvaluateResult = {
     id: string | null;
     stored: boolean;
   };
+  decision_id?: string;
+  prompt?: ConfirmPromptPayload;
+  timeout_ms?: number;
+  timeout_behavior?: "deny";
 };
 
 function extractNormalizedToolCall(
@@ -79,46 +85,68 @@ function extractNormalizedToolCall(
 export async function evaluateHotPath(input: EvaluateInput): Promise<EvaluateResult> {
   const { accountId, apiKeyId, body } = input;
 
-  // 1. Resolve agent
   const agent = await resolveAgentForAccount(accountId, body.agent_id);
 
-  // 2. Resolve action class
   const actionClass = await resolveActionClass(
     agent.id,
     body.tool_call.tool_name,
     body.tool_call.action_class,
   );
 
-  // 3. Load active rules
   const rules = await loadActiveRulesForAgent(agent.id);
-
-  // 4. Extract and normalize tool call
   const normalizedCall = extractNormalizedToolCall(body.tool_call, actionClass);
-
-  // 5. Match rules
   const match = matchRules(rules, normalizedCall);
 
-  // 6. Determine decision
-  const decision: "allow" | "block" = match ? "block" : "allow";
+  let decision: "allow" | "block" | "confirm";
+  let promptPayload: ConfirmPromptPayload | null = null;
+  let responseReasonCode: string | null = null;
+  let responseMessage: string | null = null;
+  let storedReasonCode: string | null = null;
+  let storedMessage: string | null = null;
 
-  // 7-8. Transaction: usage update + conditional event storage
+  if (!match) {
+    decision = "allow";
+  } else if (match.ruleType === "confirm") {
+    const pluginVersion = agent.pluginVersion;
+
+    if (!pluginVersion || semverLtOrInvalid(pluginVersion, "0.3.0")) {
+      decision = "block";
+      responseReasonCode = "plugin_version_too_old_for_confirm";
+      responseMessage =
+        "Upgrade @cogna8/openclaw-plugin to 0.3.0+ to enable confirm rules";
+
+      // plugin_version_too_old_for_confirm is not a member of reason_code_t.
+      // Persist null reasonCode and carry the upgrade text in message.
+      storedReasonCode = null;
+      storedMessage = responseMessage;
+    } else {
+      decision = "confirm";
+      promptPayload = buildConfirmPrompt(match, normalizedCall);
+      responseReasonCode = "confirmation_required";
+      responseMessage = match.message;
+      storedReasonCode = "confirmation_required";
+      storedMessage = match.message;
+    }
+  } else {
+    decision = "block";
+    responseReasonCode = match.reasonCode;
+    responseMessage = match.message;
+    storedReasonCode = match.reasonCode;
+    storedMessage = match.message;
+  }
+
   const db = getDb();
   const result = await db.$transaction(async (tx: any) => {
-    // a. Get/create usage period
     const period = await getOrCreateCurrentUsagePeriod(tx, accountId);
-
-    // b. Read account evaluation limit
     const limit = await getAccountEvaluationLimit(tx, accountId);
 
-    // c. Compute mode after increment
     const newCount = period.evaluationsUsed + 1;
     const mode: "normal" | "degraded" = newCount >= limit ? "degraded" : "normal";
 
-    // Determine whether to store event
     let willStore = false;
     let isAllowSampled = false;
 
-    if (decision === "block") {
+    if (decision === "block" || decision === "confirm") {
       willStore = true;
     } else if (mode !== "degraded") {
       isAllowSampled = shouldStoreAllowSample(
@@ -129,24 +157,26 @@ export async function evaluateHotPath(input: EvaluateInput): Promise<EvaluateRes
       willStore = isAllowSampled;
     }
 
-    // Single usage period update with all increments
     const updateData: Record<string, unknown> = {
       evaluationsUsed: { increment: 1 },
       mode,
     };
+
     if (willStore && decision === "block") {
       updateData.blocksStored = { increment: 1 };
     }
+
     if (isAllowSampled) {
       updateData.allowsStoredSampled = { increment: 1 };
     }
+
     await tx.usagePeriod.update({
       where: { id: period.id },
       data: updateData,
     });
 
-    // d. Conditionally store evaluation event
     let evaluationPublicId: string | null = null;
+
     if (willStore) {
       const stored = await storeEvaluationEvent(tx, {
         accountId,
@@ -156,8 +186,8 @@ export async function evaluateHotPath(input: EvaluateInput): Promise<EvaluateRes
         matchedRuleId: match?.ruleId ?? null,
         decision,
         mode,
-        reasonCode: match?.reasonCode ?? null,
-        message: match?.message ?? null,
+        reasonCode: storedReasonCode,
+        message: storedMessage,
         sessionId: body.session.id,
         sessionKey: body.session.key ?? null,
         channelProvider: body.channel?.provider ?? null,
@@ -168,24 +198,35 @@ export async function evaluateHotPath(input: EvaluateInput): Promise<EvaluateRes
         scope: body.tool_call.scope ?? null,
         rawInput: body.tool_call.raw_input ?? null,
       });
+
       evaluationPublicId = stored.publicId;
     }
 
     return { mode, evaluationPublicId, stored: willStore };
   });
 
-  // 9. Construct response
-  return {
+  const base: EvaluateResult = {
     decision,
     mode: result.mode,
-    rule: match
-      ? { id: match.rulePublicId, type: match.ruleType }
-      : null,
-    reason_code: match?.reasonCode ?? null,
-    message: match?.message ?? null,
+    rule: match ? { id: match.rulePublicId, type: match.ruleType } : null,
+    reason_code: responseReasonCode,
+    message: responseMessage,
     evaluation: {
       id: result.evaluationPublicId,
       stored: result.stored,
     },
   };
+
+  if (decision === "confirm") {
+    if (!promptPayload || !result.evaluationPublicId) {
+      throw new Error("Confirm decision was not stored");
+    }
+
+    base.decision_id = result.evaluationPublicId;
+    base.prompt = promptPayload;
+    base.timeout_ms = 120000;
+    base.timeout_behavior = "deny";
+  }
+
+  return base;
 }

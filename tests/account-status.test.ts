@@ -5,13 +5,17 @@ const mockAccountFindUniqueOrThrow = vi.fn();
 const mockUsagePeriodFindFirst = vi.fn();
 const mockAgentFindMany = vi.fn();
 const mockEvaluationEventFindMany = vi.fn();
+const mockEvaluationEventGroupBy = vi.fn();
 
 vi.mock("../src/lib/db.js", () => ({
   getDb: () => ({
     account: { findUniqueOrThrow: mockAccountFindUniqueOrThrow },
     usagePeriod: { findFirst: mockUsagePeriodFindFirst },
     agent: { findMany: mockAgentFindMany },
-    evaluationEvent: { findMany: mockEvaluationEventFindMany },
+    evaluationEvent: {
+      findMany: mockEvaluationEventFindMany,
+      groupBy: mockEvaluationEventGroupBy,
+    },
   }),
 }));
 
@@ -33,6 +37,7 @@ describe("account-status", () => {
     });
     mockAgentFindMany.mockResolvedValue([]);
     mockEvaluationEventFindMany.mockResolvedValue([]);
+    mockEvaluationEventGroupBy.mockResolvedValue([]);
   }
 
   it("returns correct account plan and limits", async () => {
@@ -61,11 +66,48 @@ describe("account-status", () => {
     mockUsagePeriodFindFirst.mockResolvedValue(null);
     mockAgentFindMany.mockResolvedValue([]);
     mockEvaluationEventFindMany.mockResolvedValue([]);
+    mockEvaluationEventGroupBy.mockResolvedValue([]);
 
     const result = await getAccountStatus("acct-uuid");
 
     expect(result.account.evaluations_used).toBe(0);
     expect(result.account.mode).toBe("normal");
+  });
+
+  it("approvals aggregate is zero when no confirm events", async () => {
+    setupDefaults();
+
+    const result = await getAccountStatus("acct-uuid");
+
+    expect(result.approvals).toEqual({
+      requested: 0,
+      resolved_allow: 0,
+      resolved_deny: 0,
+      resolved_timeout: 0,
+      unresolved: 0,
+    });
+  });
+
+  it("approvals aggregate sums resolution buckets correctly", async () => {
+    setupDefaults();
+    mockEvaluationEventGroupBy.mockResolvedValue([
+      { resolution: "allow_once", _count: { _all: 3 } },
+      { resolution: "allow_always", _count: { _all: 2 } },
+      { resolution: "deny", _count: { _all: 4 } },
+      { resolution: "cancelled", _count: { _all: 1 } },
+      { resolution: "timeout", _count: { _all: 5 } },
+      { resolution: null, _count: { _all: 7 } },
+    ]);
+
+    const result = await getAccountStatus("acct-uuid");
+
+    expect(result.approvals).toEqual({
+      requested: 22,
+      resolved_allow: 5,
+      resolved_deny: 5,
+      resolved_timeout: 5,
+      unresolved: 7,
+    });
   });
 
   it("period boundaries are computed timestamps, not raw DB dates", async () => {

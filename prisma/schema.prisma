@@ -91,6 +91,17 @@ enum channel_type_t {
 enum decision_t {
   allow
   block
+  confirm
+}
+
+enum DecisionResolution_t {
+  allow_once
+  allow_always
+  deny
+  timeout
+  cancelled
+
+  @@map("decision_resolution_t")
 }
 
 enum eval_mode_t {
@@ -333,6 +344,8 @@ model EvaluationEvent {
   matchedRuleId   String?         @map("matched_rule_id") @db.Uuid
   usagePeriodId   String          @map("usage_period_id") @db.Uuid
   decision        decision_t
+  resolution      DecisionResolution_t? @map("resolution")
+  resolvedAt      DateTime?             @map("resolved_at") @db.Timestamptz
   mode            eval_mode_t
   reasonCode      reason_code_t?  @map("reason_code")
   message         String?

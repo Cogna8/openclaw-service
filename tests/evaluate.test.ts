@@ -57,6 +57,7 @@ function setupAgent(overrides: Record<string, unknown> = {}) {
     accountId: "acct-uuid",
     catalogHash: "abc123",
     status: "active",
+    pluginVersion: "0.3.0",
     ...overrides,
   });
 }
@@ -238,7 +239,7 @@ describe("evaluateHotPath", () => {
     expect(result.reason_code).toBe("excluded_target");
   });
 
-  it("confirm rule match -> block with confirmation_required", async () => {
+  it("confirm rule match -> confirm with confirmation_required (plugin >= 0.3.0)", async () => {
     setupAgent();
     mockAgentToolFindFirst.mockResolvedValue({ actionClass: "file_delete" });
     mockRuleFindMany.mockResolvedValue([
@@ -261,9 +262,12 @@ describe("evaluateHotPath", () => {
       }),
     );
 
-    expect(result.decision).toBe("block");
+    expect(result.decision).toBe("confirm");
     expect(result.rule).toEqual({ id: "rl_confirm1", type: "confirm" });
     expect(result.reason_code).toBe("confirmation_required");
+    expect(result.decision_id).toBe("ev_test123");
+    expect(result.evaluation.id).toBe("ev_test123");
+    expect(result.prompt?.title).toBe("File deletion requires approval");
   });
 
   it("action class resolved from tool catalog when not in body", async () => {
