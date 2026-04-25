@@ -4,6 +4,7 @@ import {
   setCachedActiveRules,
   type CachedRule,
 } from "./rule-cache.js";
+import { globToRegex, hasGlob } from "../lib/glob-to-regex.js";
 
 export type { CachedRule };
 
@@ -31,8 +32,16 @@ export async function loadActiveRulesForAgent(agentId: string): Promise<CachedRu
     publicId: r.publicId,
     type: r.type as CachedRule["type"],
     toolMatch: r.toolMatch,
+    toolMatchRegex:
+      r.toolMatch !== null && hasGlob(r.toolMatch)
+        ? globToRegex(r.toolMatch.toLowerCase())
+        : null,
     targetKind: r.targetKind as CachedRule["targetKind"],
     targetValueNormalized: r.targetValueNormalized,
+    targetValueRegex:
+      r.targetValueNormalized !== null && hasGlob(r.targetValueNormalized)
+        ? globToRegex(r.targetValueNormalized.toLowerCase())
+        : null,
     thresholdMax: r.thresholdMax,
     thresholdPeriod: r.thresholdPeriod as CachedRule["thresholdPeriod"],
   }));

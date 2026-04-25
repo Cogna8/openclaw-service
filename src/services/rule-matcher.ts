@@ -32,9 +32,18 @@ const PRIORITY_ORDER: CachedRule["type"][] = [
 
 function toolMatches(rule: CachedRule, call: NormalizedToolCall): boolean {
   if (!rule.toolMatch) return false;
+
+  const toolName = call.toolName.toLowerCase();
+  const actionClass = call.actionClass?.toLowerCase() ?? null;
+
+  if (rule.toolMatchRegex) {
+    if (actionClass !== null && rule.toolMatchRegex.test(actionClass)) return true;
+    return rule.toolMatchRegex.test(toolName);
+  }
+
   const rm = rule.toolMatch.toLowerCase();
-  if (call.actionClass && rm === call.actionClass.toLowerCase()) return true;
-  return rm === call.toolName.toLowerCase();
+  if (actionClass !== null && rm === actionClass) return true;
+  return rm === toolName;
 }
 
 function targetMatches(
@@ -50,15 +59,13 @@ function targetMatches(
 
   if (callValue === null) return false;
 
-  const ruleVal = rule.targetValueNormalized.toLowerCase();
   const cv = callValue.toLowerCase();
 
-  if (rule.targetKind === "path" && ruleVal.endsWith("/*")) {
-    const prefix = ruleVal.slice(0, -1); // keep trailing /
-    return cv.startsWith(prefix);
+  if (rule.targetValueRegex) {
+    return rule.targetValueRegex.test(cv);
   }
 
-  return cv === ruleVal;
+  return cv === rule.targetValueNormalized.toLowerCase();
 }
 
 function targetDescription(rule: CachedRule): string {
