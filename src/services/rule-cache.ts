@@ -3,8 +3,10 @@ export type CachedRule = {
   publicId: string;
   type: "block" | "confirm" | "exclude" | "protect" | "threshold";
   toolMatch: string | null;
+  toolMatchRegex: RegExp | null;
   targetKind: "sender" | "path" | "resource_id" | null;
   targetValueNormalized: string | null;
+  targetValueRegex: RegExp | null;
   thresholdMax: number | null;
   thresholdPeriod: "session" | null;
 };
