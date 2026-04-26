@@ -52,7 +52,7 @@ export const MIX_TOLERANCE = 0.05;
 export const MISMATCH_CEILING = 0.001;
 
 const TARGET_KINDS = ["sender", "path", "resource_id", null];
-const RAW_INPUT_SIZES = [0, 512, 1024, 2048];
+const RAW_INPUT_SIZES = [0, 512, 1024, 1985];  // 1985 + {"content":""} wrapper = 1998 bytes, safely under 2KB cap
 
 function pick(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
