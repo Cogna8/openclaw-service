@@ -28,6 +28,7 @@ export type PolicyTemplate = {
   description: string;
   defaultEnabled: boolean;
   variants: string[]; // tool-name matches, lowercase, unique
+  variantsDetailed: { pattern: string; description: string }[];
 };
 
 export const POLICY_TEMPLATES: readonly PolicyTemplate[] = [
@@ -52,6 +53,21 @@ export const POLICY_TEMPLATES: readonly PolicyTemplate[] = [
       "execute_command",
       "subprocess",
     ],
+    variantsDetailed: [
+      { pattern: "shell", description: "Generic shell invocation" },
+      { pattern: "bash", description: "Bash shell (Linux/macOS)" },
+      { pattern: "zsh", description: "Zsh shell (macOS default)" },
+      { pattern: "sh", description: "POSIX shell" },
+      { pattern: "cmd", description: "Windows Command Prompt" },
+      { pattern: "powershell", description: "Windows PowerShell" },
+      { pattern: "pwsh", description: "PowerShell Core (cross-platform)" },
+      { pattern: "run_shell_command", description: "Run a shell command" },
+      { pattern: "execute_shell", description: "Execute via shell" },
+      { pattern: "shell_exec", description: "Shell execution call" },
+      { pattern: "exec_command", description: "Execute a system command" },
+      { pattern: "execute_command", description: "Execute a system command" },
+      { pattern: "subprocess", description: "Spawn a child process" },
+    ],
   },
   {
     id: "block_file_deletion",
@@ -68,6 +84,16 @@ export const POLICY_TEMPLATES: readonly PolicyTemplate[] = [
       "remove_file",
       "del",
       "trash",
+    ],
+    variantsDetailed: [
+      { pattern: "file_delete", description: "Delete a file" },
+      { pattern: "delete_file", description: "Delete a file" },
+      { pattern: "rm", description: "Remove files (Unix rm)" },
+      { pattern: "rmdir", description: "Remove a directory" },
+      { pattern: "unlink", description: "Unlink a file from the filesystem" },
+      { pattern: "remove_file", description: "Remove a file" },
+      { pattern: "del", description: "Delete files (Windows del)" },
+      { pattern: "trash", description: "Move to trash" },
     ],
   },
   {
@@ -89,6 +115,19 @@ export const POLICY_TEMPLATES: readonly PolicyTemplate[] = [
       "modify_file",
       "overwrite_file",
     ],
+    variantsDetailed: [
+      { pattern: "file_write", description: "Write content to a file" },
+      { pattern: "write_file", description: "Write content to a file" },
+      { pattern: "create_file", description: "Create a new file" },
+      { pattern: "edit_file", description: "Edit an existing file" },
+      { pattern: "str_replace", description: "Find and replace text in a file" },
+      { pattern: "save_file", description: "Save content to a file" },
+      { pattern: "update_file", description: "Update file contents" },
+      { pattern: "patch_file", description: "Apply a patch to a file" },
+      { pattern: "append_file", description: "Append content to a file" },
+      { pattern: "modify_file", description: "Modify file contents" },
+      { pattern: "overwrite_file", description: "Overwrite a file completely" },
+    ],
   },
   {
     id: "block_outbound_http",
@@ -105,6 +144,16 @@ export const POLICY_TEMPLATES: readonly PolicyTemplate[] = [
       "curl",
       "wget",
       "web_fetch",
+    ],
+    variantsDetailed: [
+      { pattern: "http_request", description: "Make an HTTP request" },
+      { pattern: "http_get", description: "HTTP GET request" },
+      { pattern: "http_post", description: "HTTP POST request" },
+      { pattern: "http_put", description: "HTTP PUT request" },
+      { pattern: "http_delete", description: "HTTP DELETE request" },
+      { pattern: "curl", description: "Fetch a URL (curl)" },
+      { pattern: "wget", description: "Download from a URL (wget)" },
+      { pattern: "web_fetch", description: "Fetch web content" },
     ],
   },
   {
@@ -126,6 +175,20 @@ export const POLICY_TEMPLATES: readonly PolicyTemplate[] = [
       "eval",
       "run_javascript",
       "execute_python",
+    ],
+    variantsDetailed: [
+      { pattern: "python", description: "Run Python code" },
+      { pattern: "run_python", description: "Run a Python script" },
+      { pattern: "node", description: "Run Node.js code" },
+      { pattern: "run_node", description: "Run a Node.js script" },
+      { pattern: "run_code", description: "Execute arbitrary code" },
+      { pattern: "run_script", description: "Run a script file" },
+      { pattern: "code_exec", description: "Execute code" },
+      { pattern: "execute_code", description: "Execute code" },
+      { pattern: "exec", description: "Execute a command or code" },
+      { pattern: "eval", description: "Evaluate an expression or code" },
+      { pattern: "run_javascript", description: "Run JavaScript code" },
+      { pattern: "execute_python", description: "Execute Python code" },
     ],
   },
 ];

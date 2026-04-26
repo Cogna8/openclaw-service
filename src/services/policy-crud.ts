@@ -26,6 +26,7 @@ import { invalidateAgentRules } from "./rule-cache.js";
 export type PolicyVariantRule = {
   public_id: string;
   agent_public_id: string;
+  agent_name: string;
   tool_match: string;
   status: "active" | "disabled" | "removed";
 };
@@ -38,6 +39,7 @@ export type PolicyListItem = {
   enabled: boolean;
   enabled_at: string | null;
   variants: string[]; // all variants the template *defines*
+  variants_detailed: { pattern: string; description: string }[];
   rules: PolicyVariantRule[]; // actual rules in DB for this account (grouped across agents)
 };
 
@@ -62,7 +64,7 @@ export async function listPoliciesForAccount(
         sourceTemplate: true,
         toolMatch: true,
         status: true,
-        agent: { select: { publicId: true } },
+        agent: { select: { publicId: true, name: true } },
       },
     }),
   ]);
@@ -78,6 +80,7 @@ export async function listPoliciesForAccount(
       .map((r: any): PolicyVariantRule => ({
         public_id: r.publicId,
         agent_public_id: r.agent.publicId,
+        agent_name: r.agent.name,
         tool_match: r.toolMatch ?? "",
         status: r.status,
       }));
@@ -92,6 +95,7 @@ export async function listPoliciesForAccount(
         ? (enabledAt instanceof Date ? enabledAt.toISOString() : String(enabledAt))
         : null,
       variants: [...template.variants],
+      variants_detailed: template.variantsDetailed,
       rules: rulesForTemplate,
     };
   });
