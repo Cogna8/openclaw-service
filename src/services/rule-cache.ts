@@ -28,31 +28,34 @@ let cacheHits = 0;
 let cacheMisses = 0;
 
 function recordHit(): void {
-  if (BENCH_INSTRUMENTATION) cacheHits += 1;
+  if (!BENCH_INSTRUMENTATION) return;
+  cacheHits += 1;
+  maybeLogCacheStats();
 }
 
 function recordMiss(): void {
-  if (BENCH_INSTRUMENTATION) cacheMisses += 1;
+  if (!BENCH_INSTRUMENTATION) return;
+  cacheMisses += 1;
+  maybeLogCacheStats();
 }
 
-if (BENCH_INSTRUMENTATION) {
-  const timer = setInterval(() => {
-    const total = cacheHits + cacheMisses;
-    const hitRate = total > 0 ? cacheHits / total : 0;
-    console.log(
-      JSON.stringify({
-        bench: "rule_cache",
-        hits: cacheHits,
-        misses: cacheMisses,
-        total,
-        hit_rate: Number(hitRate.toFixed(4)),
-      }),
-    );
-  }, 30_000);
-  // Allow process to exit even if timer is running.
-  if (timer && typeof timer === "object" && "unref" in timer) {
-    timer.unref();
-  }
+// Serverless-safe: emit on every Nth call instead of via setInterval, since
+// Vercel lambda processes suspend between requests and timers never fire.
+const BENCH_LOG_INTERVAL = 50;
+function maybeLogCacheStats(): void {
+  if (!BENCH_INSTRUMENTATION) return;
+  const total = cacheHits + cacheMisses;
+  if (total === 0 || total % BENCH_LOG_INTERVAL !== 0) return;
+  const hitRate = cacheHits / total;
+  console.log(
+    JSON.stringify({
+      bench: "rule_cache",
+      hits: cacheHits,
+      misses: cacheMisses,
+      total,
+      hit_rate: Number(hitRate.toFixed(4)),
+    }),
+  );
 }
 
 export function getCachedActiveRules(agentId: string): CachedRule[] | null {
