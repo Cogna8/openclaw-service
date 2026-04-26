@@ -167,6 +167,10 @@ function fmtPct(v) {
   return typeof v === "number" ? `${(v * 100).toFixed(2)}%` : "n/a";
 }
 
+function fmtTarget(rate) {
+  return `${(rate * 100).toFixed(0)}%`;
+}
+
 export function handleSummary(data) {
   const m = data.metrics;
   const allow = m.decisions_allow_total?.values?.count || 0;
@@ -181,11 +185,11 @@ export function handleSummary(data) {
     `=== ${RUN_LABEL} / phase=${PHASE} ===`,
     `iterations:           ${m.iterations?.values?.count || 0}`,
     `decisions (total):    ${total}`,
-    `  allow:              ${allow} (${fmtPct(m.decision_allow_rate?.values?.rate)}, target 70%)`,
-    `  block:              ${block} (${fmtPct(m.decision_block_rate?.values?.rate)}, target 20%)`,
-    `  confirm:            ${confirm} (${fmtPct(m.decision_confirm_rate?.values?.rate)}, target 10%)`,
+    `  allow:              ${allow} (${fmtPct(m.decision_allow_rate?.values?.rate)}, target ${fmtTarget(EXPECTED_DISTRIBUTION.allow)} ±${MIX_TOLERANCE * 100}pp)`,
+    `  block:              ${block} (${fmtPct(m.decision_block_rate?.values?.rate)}, target ${fmtTarget(EXPECTED_DISTRIBUTION.block)} ±${MIX_TOLERANCE * 100}pp)`,
+    `  confirm:            ${confirm} (${fmtPct(m.decision_confirm_rate?.values?.rate)}, target ${fmtTarget(EXPECTED_DISTRIBUTION.confirm)} ±${MIX_TOLERANCE * 100}pp)`,
     `  unexpected:         ${unexpected}`,
-    `  mismatches (e≠a):   ${mismatch} (${fmtPct(m.decision_mismatch_rate?.values?.rate)})`,
+    `  mismatches (e≠a):   ${mismatch} (${fmtPct(m.decision_mismatch_rate?.values?.rate)}, ceiling ${MISMATCH_CEILING * 100}%)`,
     "",
     "latency (http_req_duration):",
     `  p50:                ${fmtMs(m.http_req_duration?.values?.med)}`,
