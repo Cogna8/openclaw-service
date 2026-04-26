@@ -81,6 +81,15 @@ const decisionConfirm = new Counter("decisions_confirm_total");
 const decisionUnexpected = new Counter("decisions_unexpected_total");
 const decisionMismatch = new Counter("decisions_mismatch_total");
 
+// Track failures by HTTP status code (e.g., 429, 500, 502, 503) so the
+// summary reveals what kind of error we're hitting under load.
+const httpStatusCounters = {};
+function bumpStatus(code) {
+  const key = `http_status_${code}`;
+  if (!httpStatusCounters[key]) httpStatusCounters[key] = new Counter(key);
+  httpStatusCounters[key].add(1);
+}
+
 const lo = (target) => Math.max(0, target - MIX_TOLERANCE).toFixed(4);
 const hi = (target) => Math.min(1, target + MIX_TOLERANCE).toFixed(4);
 
@@ -125,6 +134,8 @@ export default function () {
     },
     tags: { expected_decision: expectedDecision },
   });
+
+  bumpStatus(res.status);
 
   const ok = check(res, {
     "status 200": (r) => r.status === 200,
@@ -198,6 +209,12 @@ export function handleSummary(data) {
     `  max:                ${fmtMs(m.http_req_duration?.values?.max)}`,
     "",
     `error rate (http_req_failed): ${fmtPct(m.http_req_failed?.values?.rate)}`,
+    "",
+    "status code breakdown:",
+    ...Object.keys(m)
+      .filter((k) => k.startsWith("http_status_"))
+      .sort()
+      .map((k) => `  ${k.replace("http_status_", "")}: ${m[k]?.values?.count || 0}`),
     "",
   ];
 
