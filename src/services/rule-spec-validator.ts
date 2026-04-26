@@ -4,7 +4,7 @@ import {
   buildTargetValueNormalized,
 } from "../lib/rule-normalization.js";
 
-const TOOL_NAME_RE = /^[a-zA-Z0-9_-]+$/;
+const TOOL_NAME_RE = /^[a-zA-Z0-9_*-]+$/;
 const TARGET_KINDS = ["sender", "path", "resource_id"] as const;
 
 export type ValidatedRuleSpec = {
@@ -36,7 +36,7 @@ function validateToolField(spec: Record<string, unknown>): string {
   }
   if (!TOOL_NAME_RE.test(trimmed)) {
     throw new ValidationError(
-      "spec.tool may only contain alphanumeric characters, underscores, and hyphens",
+      "spec.tool may only contain alphanumeric characters, underscores, hyphens, and the wildcard '*'",
       "spec.tool",
     );
   }
