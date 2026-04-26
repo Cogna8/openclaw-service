@@ -47,8 +47,9 @@ export const EXPECTED_DISTRIBUTION = {
 export const MIX_TOLERANCE = 0.05;
 
 // Per-request mismatch rate ceiling (expected vs actual decision).
-// Bench rules are deterministic, so any mismatch flags rule drift.
-export const MISMATCH_CEILING = 0.01;
+// Bench rules are deterministic, so any mismatch is rule drift — set the
+// floor low enough to catch even single-rule edits mid-run.
+export const MISMATCH_CEILING = 0.001;
 
 const TARGET_KINDS = ["sender", "path", "resource_id", null];
 const RAW_INPUT_SIZES = [0, 512, 1024, 2048];

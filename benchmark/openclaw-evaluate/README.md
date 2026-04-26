@@ -77,6 +77,13 @@ of its target, otherwise k6 exits non-zero (threshold breach).
 - **Session id** cycles through 1000 distinct values (`bench-0` … `bench-999`).
 - Total request body is hard-capped at < 8 KiB (service limit).
 
+> **`raw_input` shape caveat.** The 1 KiB / 2 KiB payloads are a single
+> `content` key with repeated `x` characters. This exercises serialization
+> and network-byte realism (size varies, JSON parse cost scales) but **not**
+> real-shape realism (nested objects, mixed types, varied keys). Acceptable
+> for latency benchmarking of the eval hot path, since `raw_input` is not
+> matched against — it's stored opaquely.
+
 ## Running
 
 ```bash
@@ -125,7 +132,7 @@ done | awk '{
 - `http_req_failed   < 1%`
 - `http_req_duration p99 < 2000 ms` (soft circuit-breaker, far above publish targets)
 - `decision_allow_rate / decision_block_rate / decision_confirm_rate` within ±5pp
-- `decision_mismatch_rate < 1%` (bench rules are deterministic; mismatches mean drift)
+- `decision_mismatch_rate < 0.1%` (bench rules are deterministic; even a single edited rule mid-run trips this)
 
 Any breach causes k6 to exit non-zero — the run is **invalid for publishing**.
 
