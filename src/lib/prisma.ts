@@ -22,5 +22,14 @@ export function createPrismaClient(databaseUrl?: string): PrismaClient {
   const cleanUrl = new URL(url);
   cleanUrl.searchParams.delete("channel_binding");
   const adapter = new PrismaNeon({ connectionString: cleanUrl.toString() });
-  return new PrismaClient({ adapter });
+
+  // Bench instrumentation (COG-166): when CG8_BENCH_INSTRUMENTATION=1,
+  // emit every query to the log so the Step 6 hot-path inspection can
+  // count roundtrips per request scenario. Remove after the benchmark
+  // per spec Step 11.
+  const clientOptions: ConstructorParameters<typeof PrismaClient>[0] = { adapter };
+  if (process.env.CG8_BENCH_INSTRUMENTATION === "1") {
+    clientOptions.log = ["query"];
+  }
+  return new PrismaClient(clientOptions);
 }
