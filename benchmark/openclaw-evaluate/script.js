@@ -81,13 +81,34 @@ const decisionConfirm = new Counter("decisions_confirm_total");
 const decisionUnexpected = new Counter("decisions_unexpected_total");
 const decisionMismatch = new Counter("decisions_mismatch_total");
 
-// Track failures by HTTP status code (e.g., 429, 500, 502, 503) so the
-// summary reveals what kind of error we're hitting under load.
-const httpStatusCounters = {};
+// Pre-declare counters for status codes we expect to see.
+// k6 requires metrics declared at init time, not lazily inside iteration.
+const httpStatus200 = new Counter("http_status_200");
+const httpStatus400 = new Counter("http_status_400");
+const httpStatus401 = new Counter("http_status_401");
+const httpStatus403 = new Counter("http_status_403");
+const httpStatus404 = new Counter("http_status_404");
+const httpStatus429 = new Counter("http_status_429");
+const httpStatus500 = new Counter("http_status_500");
+const httpStatus502 = new Counter("http_status_502");
+const httpStatus503 = new Counter("http_status_503");
+const httpStatus504 = new Counter("http_status_504");
+const httpStatusOther = new Counter("http_status_other");
+
 function bumpStatus(code) {
-  const key = `http_status_${code}`;
-  if (!httpStatusCounters[key]) httpStatusCounters[key] = new Counter(key);
-  httpStatusCounters[key].add(1);
+  switch (code) {
+    case 200: httpStatus200.add(1); break;
+    case 400: httpStatus400.add(1); break;
+    case 401: httpStatus401.add(1); break;
+    case 403: httpStatus403.add(1); break;
+    case 404: httpStatus404.add(1); break;
+    case 429: httpStatus429.add(1); break;
+    case 500: httpStatus500.add(1); break;
+    case 502: httpStatus502.add(1); break;
+    case 503: httpStatus503.add(1); break;
+    case 504: httpStatus504.add(1); break;
+    default: httpStatusOther.add(1);
+  }
 }
 
 const lo = (target) => Math.max(0, target - MIX_TOLERANCE).toFixed(4);
