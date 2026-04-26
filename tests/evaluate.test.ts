@@ -424,6 +424,62 @@ describe("evaluateHotPath", () => {
     expect(["normal", "degraded"]).toContain(result.mode);
   });
 
+  describe("bench account bypass", () => {
+    function benchInput(): EvaluateInput {
+      return {
+        ...makeInput(),
+        capabilityFlags: { benchAccount: true },
+      };
+    }
+
+    it("does not fetch the monthly limit", async () => {
+      setupAgent();
+      mockAgentToolFindFirst.mockResolvedValue(null);
+      setupNoRules();
+      setupUsage(9999, 10000); // would normally flip to degraded
+
+      const result = await evaluateHotPath(benchInput());
+
+      expect(result.mode).toBe("normal");
+      expect(mockAccountFindUniqueOrThrow).not.toHaveBeenCalled();
+    });
+
+    it("does not increment evaluationsUsed", async () => {
+      setupAgent();
+      mockAgentToolFindFirst.mockResolvedValue(null);
+      setupNoRules();
+      setupUsage();
+
+      await evaluateHotPath(benchInput());
+
+      expect(mockUsagePeriodUpdate).not.toHaveBeenCalled();
+    });
+
+    it("stays in normal mode even past the cap", async () => {
+      setupAgent();
+      mockAgentToolFindFirst.mockResolvedValue(null);
+      setupNoRules();
+      setupUsage(50_000, 10_000); // 5x past the cap
+
+      const result = await evaluateHotPath(benchInput());
+
+      expect(result.decision).toBe("allow");
+      expect(result.mode).toBe("normal");
+    });
+
+    it("non-bench account still fetches limit and increments", async () => {
+      setupAgent();
+      mockAgentToolFindFirst.mockResolvedValue(null);
+      setupNoRules();
+      setupUsage();
+
+      await evaluateHotPath(makeInput());
+
+      expect(mockAccountFindUniqueOrThrow).toHaveBeenCalled();
+      expect(mockUsagePeriodUpdate).toHaveBeenCalled();
+    });
+  });
+
   it("response shape matches locked contract for block", async () => {
     setupAgent();
     mockAgentToolFindFirst.mockResolvedValue(null);

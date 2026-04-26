@@ -34,7 +34,7 @@ export function authenticatedJsonPost<TBody>(opts: {
   return async (req: NextRequest) => {
     try {
       const auth = await authenticateRequest(req);
-      checkRateLimit(auth.apiKeyId);
+      checkRateLimit(auth.apiKeyId, auth.account);
       const rawBody = (await parseJsonBody(req)) as Record<string, unknown>;
       opts.validate(rawBody);
       const body = opts.normalize(rawBody) as TBody;
@@ -57,7 +57,7 @@ export function authenticatedGet<TQuery>(opts: {
   return async (req: NextRequest) => {
     try {
       const auth = await authenticateRequest(req);
-      checkRateLimit(auth.apiKeyId);
+      checkRateLimit(auth.apiKeyId, auth.account);
       const rawQuery = opts.validate(req.nextUrl.searchParams);
       const query = opts.normalize(rawQuery);
       return await opts.handler({ req, auth, body: undefined, query, params: undefined as never });
@@ -81,7 +81,7 @@ export function authenticatedParamRoute<TParams>(opts: {
   return async (req: NextRequest, context: { params: Promise<TParams> }) => {
     try {
       const auth = await authenticateRequest(req);
-      checkRateLimit(auth.apiKeyId);
+      checkRateLimit(auth.apiKeyId, auth.account);
       const params = await context.params;
       opts.validate(params);
       return await opts.handler({ req, auth, body: undefined, query: undefined as never, params });
@@ -101,7 +101,7 @@ export function authenticatedRoute(opts: {
   return async (req: NextRequest) => {
     try {
       const auth = await authenticateRequest(req);
-      checkRateLimit(auth.apiKeyId);
+      checkRateLimit(auth.apiKeyId, auth.account);
       return await opts.handler({ req, auth, body: undefined, query: undefined as never, params: undefined as never });
     } catch (error) {
       return handleApiError(error);

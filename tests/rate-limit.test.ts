@@ -53,4 +53,58 @@ describe("rate limiter", () => {
     _resetRateLimitState();
     expect(() => checkRateLimit("key_reset")).not.toThrow();
   });
+
+  describe("benchAccount bypass", () => {
+    const benchAccount = { capabilityFlags: { benchAccount: true } };
+
+    it("allows 200 calls within the window for a bench account", () => {
+      for (let i = 0; i < 200; i++) {
+        expect(() => checkRateLimit("key_bench", benchAccount)).not.toThrow();
+      }
+    });
+
+    it("non-bench account still gets 429 on the 101st call", () => {
+      const normal = { capabilityFlags: {} };
+      for (let i = 0; i < 100; i++) {
+        checkRateLimit("key_nonbench", normal);
+      }
+      expect(() => checkRateLimit("key_nonbench", normal)).toThrow(
+        RateLimitError,
+      );
+    });
+
+    it("bench bypass requires the flag to be exactly true", () => {
+      const truthy = { capabilityFlags: { benchAccount: "true" } };
+      for (let i = 0; i < 100; i++) {
+        checkRateLimit("key_truthy", truthy);
+      }
+      expect(() => checkRateLimit("key_truthy", truthy)).toThrow(
+        RateLimitError,
+      );
+    });
+
+    it("bench bypass does not record state (other accounts unaffected)", () => {
+      for (let i = 0; i < 500; i++) {
+        checkRateLimit("key_shared", benchAccount);
+      }
+      // A non-bench call on the same key should still get a fresh window.
+      for (let i = 0; i < 100; i++) {
+        expect(() =>
+          checkRateLimit("key_shared", { capabilityFlags: {} }),
+        ).not.toThrow();
+      }
+      expect(() =>
+        checkRateLimit("key_shared", { capabilityFlags: {} }),
+      ).toThrow(RateLimitError);
+    });
+
+    it("missing account arg falls back to enforcement", () => {
+      for (let i = 0; i < 100; i++) {
+        checkRateLimit("key_missing_account");
+      }
+      expect(() => checkRateLimit("key_missing_account")).toThrow(
+        RateLimitError,
+      );
+    });
+  });
 });

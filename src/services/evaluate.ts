@@ -11,10 +11,12 @@ import { shouldStoreAllowSample, storeEvaluationEvent } from "./event-store.js";
 import { normalizePath } from "../lib/rule-normalization.js";
 import { buildConfirmPrompt, type ConfirmPromptPayload } from "./confirm-prompt.js";
 import { semverLtOrInvalid } from "../lib/semver-compare.js";
+import { isBenchAccount } from "../lib/account-flags.js";
 
 export type EvaluateInput = {
   accountId: string;
   apiKeyId: string;
+  capabilityFlags?: unknown;
   body: {
     agent_id: string;
     session: { id: string; key?: string };
@@ -84,6 +86,7 @@ function extractNormalizedToolCall(
 
 export async function evaluateHotPath(input: EvaluateInput): Promise<EvaluateResult> {
   const { accountId, apiKeyId, body } = input;
+  const benchAccount = isBenchAccount(input.capabilityFlags);
 
   const agent = await resolveAgentForAccount(accountId, body.agent_id);
 
@@ -138,10 +141,17 @@ export async function evaluateHotPath(input: EvaluateInput): Promise<EvaluateRes
   const db = getDb();
   const result = await db.$transaction(async (tx: any) => {
     const period = await getOrCreateCurrentUsagePeriod(tx, accountId);
-    const limit = await getAccountEvaluationLimit(tx, accountId);
 
-    const newCount = period.evaluationsUsed + 1;
-    const mode: "normal" | "degraded" = newCount >= limit ? "degraded" : "normal";
+    // Bench accounts skip the monthly cap and the increment write entirely so
+    // benchmark traffic doesn't churn usage counters or flip mode to degraded.
+    let mode: "normal" | "degraded";
+    if (benchAccount) {
+      mode = "normal";
+    } else {
+      const limit = await getAccountEvaluationLimit(tx, accountId);
+      const newCount = period.evaluationsUsed + 1;
+      mode = newCount >= limit ? "degraded" : "normal";
+    }
 
     let willStore = false;
     let isAllowSampled = false;
@@ -157,23 +167,25 @@ export async function evaluateHotPath(input: EvaluateInput): Promise<EvaluateRes
       willStore = isAllowSampled;
     }
 
-    const updateData: Record<string, unknown> = {
-      evaluationsUsed: { increment: 1 },
-      mode,
-    };
+    if (!benchAccount) {
+      const updateData: Record<string, unknown> = {
+        evaluationsUsed: { increment: 1 },
+        mode,
+      };
 
-    if (willStore && decision === "block") {
-      updateData.blocksStored = { increment: 1 };
+      if (willStore && decision === "block") {
+        updateData.blocksStored = { increment: 1 };
+      }
+
+      if (isAllowSampled) {
+        updateData.allowsStoredSampled = { increment: 1 };
+      }
+
+      await tx.usagePeriod.update({
+        where: { id: period.id },
+        data: updateData,
+      });
     }
-
-    if (isAllowSampled) {
-      updateData.allowsStoredSampled = { increment: 1 };
-    }
-
-    await tx.usagePeriod.update({
-      where: { id: period.id },
-      data: updateData,
-    });
 
     let evaluationPublicId: string | null = null;
 
