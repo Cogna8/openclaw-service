@@ -3,11 +3,23 @@ import { getDb } from "../lib/db.js";
 import { hashApiKey } from "../lib/api-key-utils.js";
 import { UnauthorizedError } from "../lib/errors.js";
 
+export type AccountCapabilityFlags = Record<string, unknown>;
+
 export type AuthContext = {
   accountId: string;
   apiKeyId: string;
   publicKeyId: string;
+  account: {
+    capabilityFlags: AccountCapabilityFlags;
+  };
 };
+
+function coerceCapabilityFlags(value: unknown): AccountCapabilityFlags {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as AccountCapabilityFlags;
+  }
+  return {};
+}
 
 export async function authenticateRequest(req: NextRequest): Promise<AuthContext> {
   const authHeader = req.headers.get("authorization");
@@ -26,7 +38,12 @@ export async function authenticateRequest(req: NextRequest): Promise<AuthContext
   const db = getDb();
   const apiKey = await db.apiKey.findFirst({
     where: { lookupHash, status: "active" },
-    select: { id: true, publicId: true, accountId: true },
+    select: {
+      id: true,
+      publicId: true,
+      accountId: true,
+      account: { select: { capabilityFlags: true } },
+    },
   });
 
   if (!apiKey) {
@@ -43,5 +60,8 @@ export async function authenticateRequest(req: NextRequest): Promise<AuthContext
     accountId: apiKey.accountId,
     apiKeyId: apiKey.id,
     publicKeyId: apiKey.publicId,
+    account: {
+      capabilityFlags: coerceCapabilityFlags(apiKey.account?.capabilityFlags),
+    },
   };
 }

@@ -1,4 +1,5 @@
 import { RateLimitError } from "../lib/errors.js";
+import { isBenchAccount } from "../lib/account-flags.js";
 
 const WINDOW_MS = 60_000;
 const MAX_REQUESTS = 100;
@@ -34,7 +35,14 @@ function ensureCleanup(): void {
   }
 }
 
-export function checkRateLimit(apiKeyId: string): void {
+export function checkRateLimit(
+  apiKeyId: string,
+  account?: { capabilityFlags?: unknown },
+): void {
+  if (account && isBenchAccount(account.capabilityFlags)) {
+    return;
+  }
+
   const now = Date.now();
   const entry = windows.get(apiKeyId);
 

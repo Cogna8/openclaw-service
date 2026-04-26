@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // --- DB mocks ---
 const mockAgentFindFirst = vi.fn();
+const mockAgentFindUniqueOrThrow = vi.fn();
 const mockAgentCreate = vi.fn();
 const mockAgentUpdate = vi.fn();
 const mockAgentCount = vi.fn();
@@ -14,12 +15,15 @@ const mockAgentToolCount = vi.fn();
 const mockUsagePeriodFindFirst = vi.fn();
 const mockUsagePeriodUpsert = vi.fn();
 const mockUsagePeriodUpdate = vi.fn();
+const mockAccountPolicyEnablementFindMany = vi.fn();
+const mockRuleCount = vi.fn();
 const mockTransaction = vi.fn();
 
 vi.mock("../src/lib/db.js", () => ({
   getDb: () => ({
     agent: {
       findFirst: mockAgentFindFirst,
+      findUniqueOrThrow: mockAgentFindUniqueOrThrow,
       create: mockAgentCreate,
       update: mockAgentUpdate,
       count: mockAgentCount,
@@ -37,6 +41,10 @@ vi.mock("../src/lib/db.js", () => ({
       upsert: mockUsagePeriodUpsert,
       update: mockUsagePeriodUpdate,
     },
+    accountPolicyEnablement: {
+      findMany: mockAccountPolicyEnablementFindMany,
+    },
+    rule: { count: mockRuleCount },
     $transaction: mockTransaction,
   }),
 }));
@@ -77,6 +85,7 @@ function setupTransaction() {
     const txClient = {
       agent: {
         findFirst: mockAgentFindFirst,
+        findUniqueOrThrow: mockAgentFindUniqueOrThrow,
         create: mockAgentCreate,
         update: mockAgentUpdate,
         count: mockAgentCount,
@@ -94,6 +103,10 @@ function setupTransaction() {
         upsert: mockUsagePeriodUpsert,
         update: mockUsagePeriodUpdate,
       },
+      accountPolicyEnablement: {
+        findMany: mockAccountPolicyEnablementFindMany,
+      },
+      rule: { count: mockRuleCount },
     };
     return fn(txClient);
   });
@@ -114,6 +127,14 @@ describe("agent-registration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     setupTransaction();
+    // Default: no policies enabled (materializer is a no-op)
+    mockAccountPolicyEnablementFindMany.mockResolvedValue([]);
+    // Default: re-read after transaction returns shape used by both code paths
+    mockAgentFindUniqueOrThrow.mockResolvedValue({
+      publicId: "agt_testABCD",
+      toolsRegisteredCount: 2,
+      activeRulesCount: 0,
+    });
   });
 
   // --- New agent ---

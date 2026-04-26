@@ -11,6 +11,7 @@ export const POST = authenticatedJsonPost({
     const input: EvaluateInput = {
       accountId: auth.accountId,
       apiKeyId: auth.apiKeyId,
+      capabilityFlags: auth.account.capabilityFlags,
       body: body as EvaluateInput["body"],
     };
     const result = await evaluateHotPath(input);

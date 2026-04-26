@@ -75,6 +75,7 @@ describe("authenticateRequest", () => {
       id: "uuid-internal-id",
       publicId: "key_abc12345",
       accountId: "acct_xyz",
+      account: { capabilityFlags: {} },
     });
     const ctx = await authenticateRequest(
       makeRequest("Bearer cg8_sk_valid_key_here"),
@@ -83,6 +84,7 @@ describe("authenticateRequest", () => {
       accountId: "acct_xyz",
       apiKeyId: "uuid-internal-id",
       publicKeyId: "key_abc12345",
+      account: { capabilityFlags: {} },
     });
   });
 
@@ -91,11 +93,17 @@ describe("authenticateRequest", () => {
       id: 1,
       publicId: "key_abc12345",
       accountId: "acct_xyz",
+      account: { capabilityFlags: {} },
     });
     await authenticateRequest(makeRequest("Bearer cg8_sk_test_token"));
     expect(mockFindFirst).toHaveBeenCalledWith({
       where: { lookupHash: expect.any(String), status: "active" },
-      select: { id: true, publicId: true, accountId: true },
+      select: {
+        id: true,
+        publicId: true,
+        accountId: true,
+        account: { select: { capabilityFlags: true } },
+      },
     });
   });
 
@@ -104,6 +112,7 @@ describe("authenticateRequest", () => {
       id: 42,
       publicId: "key_abc12345",
       accountId: "acct_xyz",
+      account: { capabilityFlags: {} },
     });
     await authenticateRequest(makeRequest("Bearer cg8_sk_test_token"));
     expect(mockUpdate).toHaveBeenCalledWith({
@@ -117,6 +126,7 @@ describe("authenticateRequest", () => {
       id: 1,
       publicId: "key_abc12345",
       accountId: "acct_xyz",
+      account: { capabilityFlags: {} },
     });
     mockUpdate.mockRejectedValue(new Error("DB error"));
     // Should not throw despite update failure
@@ -124,5 +134,31 @@ describe("authenticateRequest", () => {
       makeRequest("Bearer cg8_sk_valid_key_here"),
     );
     expect(ctx.accountId).toBe("acct_xyz");
+  });
+
+  it("exposes capabilityFlags on auth context for bench account", async () => {
+    mockFindFirst.mockResolvedValue({
+      id: "uuid-internal-id",
+      publicId: "key_bench1",
+      accountId: "acct_bench",
+      account: { capabilityFlags: { benchAccount: true } },
+    });
+    const ctx = await authenticateRequest(
+      makeRequest("Bearer cg8_sk_bench_key"),
+    );
+    expect(ctx.account.capabilityFlags).toEqual({ benchAccount: true });
+  });
+
+  it("coerces null capabilityFlags to empty object", async () => {
+    mockFindFirst.mockResolvedValue({
+      id: 1,
+      publicId: "key_abc12345",
+      accountId: "acct_xyz",
+      account: { capabilityFlags: null },
+    });
+    const ctx = await authenticateRequest(
+      makeRequest("Bearer cg8_sk_test_token"),
+    );
+    expect(ctx.account.capabilityFlags).toEqual({});
   });
 });
