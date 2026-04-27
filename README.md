@@ -58,3 +58,18 @@ All enums, check constraints, partial indexes, and unique constraints are define
 - Hot-path evaluation queries use normalized columns only (`toolMatch`, `targetKind`, `targetValueNormalized`, `thresholdMax`, `thresholdPeriod`), never `spec`.
 - `lookupHash` and `secretHash` use the same SHA-256 algorithm in V1. Dual columns exist for future bcrypt/argon2 upgrade on `secretHash`.
 
+### Policy templates
+
+Built-in templates currently protect common high-risk tool categories: shell
+execution, code execution, file deletion, file writes, and outbound HTTP.
+Templates are implemented as tool-name and action-class matches. Templates that
+require argument inspection, URL allowlists, or prompt-injection pattern
+matching are tracked as follow-up matcher work (COG-183, COG-184, COG-185).
+
+Each template is tagged with a `risk_class` (`critical` / `high` / `medium`)
+and a `category` (`filesystem` / `network` / `code_execution` /
+`destructive_ops`) so the portal can group and rank them. Critical templates
+make up the "Apply critical defaults" set surfaced by
+`POST /api/v1/portal/policies/secure-defaults`. Outbound HTTP is intentionally
+off by default and is *not* part of the critical-default set.
+
