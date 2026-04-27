@@ -11,6 +11,7 @@ const mockListPoliciesForAccount = vi.fn();
 const mockEnablePolicyForAccount = vi.fn();
 const mockDisablePolicyForAccount = vi.fn();
 const mockDeleteTemplateRule = vi.fn();
+const mockApplySecureDefaultsForAccount = vi.fn();
 
 vi.mock("../src/services/policy-crud.js", () => ({
   listPoliciesForAccount: (...args: any[]) => mockListPoliciesForAccount(...args),
@@ -18,6 +19,8 @@ vi.mock("../src/services/policy-crud.js", () => ({
   disablePolicyForAccount: (...args: any[]) =>
     mockDisablePolicyForAccount(...args),
   deleteTemplateRule: (...args: any[]) => mockDeleteTemplateRule(...args),
+  applySecureDefaultsForAccount: (...args: any[]) =>
+    mockApplySecureDefaultsForAccount(...args),
 }));
 
 describe("portal policy routes", () => {
@@ -31,16 +34,21 @@ describe("portal policy routes", () => {
     });
   });
 
-  it("GET /api/v1/portal/policies returns 200 with policies", async () => {
+  it("GET /api/v1/portal/policies returns 200 with policies, including risk_class and category", async () => {
     mockListPoliciesForAccount.mockResolvedValue([
       {
         id: "block_shell_execution",
         name: "Block shell execution",
         description: "desc",
         default_enabled: true,
+        risk_class: "critical",
+        category: "code_execution",
         enabled: false,
         enabled_at: null,
         variants: ["bash"],
+        variants_detailed: [
+          { pattern: "bash", description: "Runs Bash commands" },
+        ],
         rules: [],
       },
     ]);
@@ -57,9 +65,14 @@ describe("portal policy routes", () => {
           name: "Block shell execution",
           description: "desc",
           default_enabled: true,
+          risk_class: "critical",
+          category: "code_execution",
           enabled: false,
           enabled_at: null,
           variants: ["bash"],
+          variants_detailed: [
+            { pattern: "bash", description: "Runs Bash commands" },
+          ],
           rules: [],
         },
       ],
@@ -201,5 +214,53 @@ describe("portal policy routes", () => {
     });
 
     expect(res.status).toBe(400);
+  });
+
+  it("POST /api/v1/portal/policies/secure-defaults returns 200 with apply result", async () => {
+    mockApplySecureDefaultsForAccount.mockResolvedValue({
+      enabled_template_ids: ["block_shell_execution", "block_code_execution"],
+      already_enabled_template_ids: ["block_file_deletion"],
+      rules_created: 4,
+      agents_touched: 2,
+    });
+
+    const { POST } = await import(
+      "../app/api/v1/portal/policies/secure-defaults/route.js"
+    );
+
+    const req = new NextRequest(
+      "http://localhost:3000/api/v1/portal/policies/secure-defaults",
+      { method: "POST" },
+    );
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      enabled_template_ids: ["block_shell_execution", "block_code_execution"],
+      already_enabled_template_ids: ["block_file_deletion"],
+      rules_created: 4,
+      agents_touched: 2,
+    });
+    expect(mockApplySecureDefaultsForAccount).toHaveBeenCalledWith({
+      accountId: "11111111-1111-1111-1111-111111111111",
+      actorUserId: "user_123",
+    });
+  });
+
+  it("POST /api/v1/portal/policies/secure-defaults returns 401 when auth fails", async () => {
+    const { UnauthorizedError } = await import("../src/lib/errors.js");
+    mockAuthenticatePortalRequest.mockRejectedValue(new UnauthorizedError());
+
+    const { POST } = await import(
+      "../app/api/v1/portal/policies/secure-defaults/route.js"
+    );
+
+    const req = new NextRequest(
+      "http://localhost:3000/api/v1/portal/policies/secure-defaults",
+      { method: "POST" },
+    );
+
+    const res = await POST(req);
+    expect(res.status).toBe(401);
   });
 });
