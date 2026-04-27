@@ -11,10 +11,13 @@
 import { getDb } from "../lib/db.js";
 import { NotFoundError, ValidationError } from "../lib/errors.js";
 import {
+  CRITICAL_DEFAULT_TEMPLATE_IDS,
   POLICY_TEMPLATES,
   getTemplate,
   isValidTemplateId,
   type PolicyTemplate,
+  type TemplateCategory,
+  type TemplateRiskClass,
 } from "../lib/policy-templates.js";
 import {
   materializeTemplateForAccount,
@@ -36,6 +39,8 @@ export type PolicyListItem = {
   name: string;
   description: string;
   default_enabled: boolean;
+  risk_class: TemplateRiskClass;
+  category: TemplateCategory;
   enabled: boolean;
   enabled_at: string | null;
   variants: string[]; // all variants the template *defines*
@@ -90,6 +95,8 @@ export async function listPoliciesForAccount(
       name: template.name,
       description: template.description,
       default_enabled: template.defaultEnabled,
+      risk_class: template.riskClass,
+      category: template.category,
       enabled: enabledAt !== undefined,
       enabled_at: enabledAt
         ? (enabledAt instanceof Date ? enabledAt.toISOString() : String(enabledAt))
@@ -255,6 +262,81 @@ export async function enableDefaultPoliciesForAccount(input: {
     if (result.enabled) enabled.push(template.id);
   }
   return { enabled_templates: enabled };
+}
+
+export type ApplySecureDefaultsResult = {
+  enabled_template_ids: string[];
+  already_enabled_template_ids: string[];
+  rules_created: number;
+  agents_touched: number;
+};
+
+/**
+ * Enable every template marked riskClass="critical" for an account. Idempotent
+ * because enablePolicyForAccount + the materializer both treat re-runs as a
+ * no-op: the enablement row is upserted and the rule materializer skips any
+ * rule whose normalized fingerprint already exists.
+ *
+ * Distinct callers: this is the portal "Apply critical defaults" action.
+ * enableDefaultPoliciesForAccount is for first-time account provisioning and
+ * uses defaultEnabled (a different, slightly broader set).
+ */
+export async function applySecureDefaultsForAccount(input: {
+  accountId: string;
+  actorUserId: string | null;
+}): Promise<ApplySecureDefaultsResult> {
+  const db = getDb();
+
+  const existing = await db.accountPolicyEnablement.findMany({
+    where: {
+      accountId: input.accountId,
+      templateId: { in: [...CRITICAL_DEFAULT_TEMPLATE_IDS] },
+    },
+    select: { templateId: true },
+  });
+  const alreadyEnabled = new Set(
+    existing.map((e: { templateId: string }) => e.templateId),
+  );
+
+  const enabledNow: string[] = [];
+  const alreadyEnabledList: string[] = [];
+  let totalRulesCreated = 0;
+
+  for (const templateId of CRITICAL_DEFAULT_TEMPLATE_IDS) {
+    const wasEnabledBefore = alreadyEnabled.has(templateId);
+    const result = await enablePolicyForAccount({
+      accountId: input.accountId,
+      templateId,
+      actorUserId: input.actorUserId,
+    });
+
+    totalRulesCreated += result.rules_created;
+    if (wasEnabledBefore) {
+      alreadyEnabledList.push(templateId);
+    } else {
+      enabledNow.push(templateId);
+    }
+  }
+
+  // Count agents_touched as the union of active agents with at least one
+  // critical-template rule. Summing per-template counts would double-count
+  // agents that received variants from multiple critical templates.
+  const agentsWithCriticalRules = await db.rule.findMany({
+    where: {
+      accountId: input.accountId,
+      sourceTemplate: { in: [...CRITICAL_DEFAULT_TEMPLATE_IDS] },
+      removedAt: null,
+    },
+    select: { agentId: true },
+    distinct: ["agentId"],
+  });
+
+  return {
+    enabled_template_ids: enabledNow,
+    already_enabled_template_ids: alreadyEnabledList,
+    rules_created: totalRulesCreated,
+    agents_touched: agentsWithCriticalRules.length,
+  };
 }
 
 /**
