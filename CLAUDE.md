@@ -2,7 +2,16 @@
 
 ## Git Policy (MANDATORY)
 
-Push directly to main. Do not create feature branches. Do not create pull requests. Do not force-push or rewrite git history. Ensure build and tests pass before pushing.
+Push directly to main. Do not create feature branches. Do not create pull requests. Do not force-push or rewrite git history. Ensure build and tests pass before pushing. Deploys are production-only: the Vercel Ignored Build Step is configured to skip non-production builds, so nothing deploys to preview.
+
+Before any commit, set the repo-local identity:
+
+```bash
+git config user.email "admin@cogna8.io"
+git config user.name "Cogna8"
+```
+
+The production submission email is admin@cogna8.io and only admin@cogna8.io. Never rely on a global or default git identity; Vercel Author Protection blocks deploys from any other author.
 
 ## Build
 
