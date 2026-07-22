@@ -73,3 +73,15 @@ make up the "Apply critical defaults" set surfaced by
 `POST /api/v1/portal/policies/secure-defaults`. Outbound HTTP is intentionally
 off by default and is *not* part of the critical-default set.
 
+## License
+
+This project is available under the [MIT License](LICENSE).
+
+> Please make it work.<br>
+> Love, Daniel.
+
+## Dedication
+
+Dedicated to Giora, Mike, Adam, Igor and Alex — my good friends and inspirations.
+
+Thank you.
