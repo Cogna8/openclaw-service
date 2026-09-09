@@ -7,9 +7,8 @@ set -euo pipefail
 
 PHASE_ARG="${1:-warmup}"
 
-# Hardcoded for the bench account so re-exporting between shells is impossible to forget.
-# These are NOT secrets long-term — bench account, intentionally throwaway.
-export CG8_BENCHMARK_API_KEY="${CG8_BENCHMARK_API_KEY:-cg8_sk_Rw7iOL8tQYwN1zPP2GjEfRJghy1kUY6PFtpHy5VmJsc}"
+: "${CG8_BENCHMARK_API_KEY:?Set CG8_BENCHMARK_API_KEY before running (bench account key, not committed)}"
+export CG8_BENCHMARK_API_KEY
 export CG8_BENCHMARK_AGENT_ID="${CG8_BENCHMARK_AGENT_ID:-default}"
 export CG8_BENCHMARK_RUN_LABEL="${CG8_BENCHMARK_RUN_LABEL:-2026-04-26-syd1}"
 export PHASE="$PHASE_ARG"
